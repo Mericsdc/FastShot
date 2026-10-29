@@ -294,12 +294,12 @@ public sealed class SettingsWindow : Window
         var page = Page();
         page.Children.Add(Section("Dosya çarkını açmak"));
         page.Children.Add(Toggle("Dosya sürüklerken çarkı aç", () => prefs.ConvertEnabled, on => prefs.ConvertEnabled = on));
-        page.Children.Add(Row("Çarkı açan tuş", Picker(Enum.GetValues<ConvertModifier>().Select(m => (m.Title(), m)), () => prefs.ConvertModifier, v => prefs.ConvertModifier = v)));
+        page.Children.Add(Row("Çarkı açan tuş", Picker(Enum.GetValues<ConvertModifier>().Select(m => (m.Title(), m)), () => prefs.WheelKey, v => prefs.WheelKey = v)));
         page.Children.Add(Toggle("Sağ tık menüsüne \"FastShot çarkı\" ekle", () => prefs.ConvertContextMenu, on => prefs.ConvertContextMenu = on));
         var keyNote = Note("");
         void SyncKeyNote()
         {
-            var key = prefs.ConvertModifier.Title();
+            var key = prefs.WheelKey.Title();
             keyNote.Text = $"Dosyaları sürüklerken {key} tuşuna bir kez basın; imlecin etrafında Dönüştür çarkı açılır. {key}'e tekrar bastıkça Araçlar ve İşlemler çarklarına geçersiniz; üstteki çubuğun üzerinde bir an beklemek de o çarkı açar. Seçeneğin üzerine bırakın. Sürüklemeden kullanmak için dosyalara sağ tıklayıp \"FastShot çarkı\"nı seçin (Windows 11'de önce \"Daha fazla seçenek göster\") ya da bildirim alanındaki menüden \"Dosya çarkı…\".";
         }
         SyncKeyNote();

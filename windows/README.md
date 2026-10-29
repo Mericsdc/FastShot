@@ -28,21 +28,20 @@ Kısayolları değiştirmek için bildirim alanındaki FastShot simgesine tıkla
 
 ### Dosya çarkı: dönüştür, araçlar, işlemler
 
-Dosyaları sürüklerken bir tuşa bir kez basın; imlecin etrafında o tuşun çarkı açılır, seçeneğin üzerine bırakın:
+Gezgin'de veya masaüstünde dosyaları (ya da klasörleri) sürüklerken **AltGr**'ye bir kez basın; imlecin etrafında **Dönüştür** çarkı açılır. AltGr'ye tekrar bastıkça **Araçlar** ve **İşlemler** çarklarına geçilir; halkanın üstündeki çubukta bir an beklemek de o çarkı açar. Seçeneğin üzerine bırakın.
 
-| Tuş | Çark | Ne yapar |
-| --- | --- | --- |
-| **Shift** | Dönüştür | Dosyayı başka bir biçime çevirir (tablo aşağıda) |
-| **Ctrl** | Araçlar | Görüntü: Düzenle · Kırp (Serbest, Orijinal, 1:1, 4:3, 3:2, 16:9, 9:16) · Arka plan · Sıkıştır · Meta veri sil · Metni kopyala (OCR). Video: Düzenle · Sıkıştır · Sesi kaldır · Meta veri sil. Ses: Sıkıştır (MPEG-4 seste meta veri sil). PDF: Sıkıştır · Meta veri sil · Birleştir (birden çok PDF) |
-| **Alt** | İşlemler | Her dosya ve klasör için: ZIP'le / ZIP'i aç · Paylaş (Windows'un paylaşım paneli, Yakındaki paylaşım dahil) · Panoya kopyala · Yolu kopyala · Ekrana sabitle (görüntüler) · Terminal'de aç |
+| Çark | Ne yapar |
+| --- | --- |
+| Dönüştür | Dosyayı başka bir biçime çevirir (tablo aşağıda) |
+| Araçlar | Görüntü: Düzenle · Kırp (Serbest, Orijinal, 1:1, 4:3, 3:2, 16:9, 9:16) · Arka plan · Sıkıştır · Meta veri sil · Metni kopyala (OCR). Video: Düzenle · Sıkıştır · Sesi kaldır · Meta veri sil. Ses: Sıkıştır (MPEG-4 seste meta veri sil). PDF: Sıkıştır · Meta veri sil · Birleştir (birden çok PDF) |
+| İşlemler | Her dosya ve klasör için: ZIP'le / ZIP'i aç · Paylaş (Windows'un paylaşım paneli, Yakındaki paylaşım dahil) · Panoya kopyala · Yolu kopyala · Ekrana sabitle (görüntüler) · Terminal'de aç |
 
-Çark açıkken başka bir tuşa basarak ya da halkanın üstündeki çubukta bir an bekleyerek çarklar arasında geçersiniz. Bir çarkta o dosyalar için seçenek yoksa sıradaki çark açılır. Tuşlar Ayarlar › Dosya çarkı'ndan değiştirilir; başka bir çarkın tuşunu seçerseniz iki çarkın tuşları yer değiştirir.
+Bir çarkta o dosyalar için seçenek yoksa sıradaki çark açılır. AltGr yalnızca dosya sürüklerken çark açar; yazı yazarken (ör. AltGr+Q ile @) etkilemez. Tuş Ayarlar › Dosya çarkı'ndan Shift, Ctrl veya Alt yapılabilir.
 
 Sürüklemeden açmanın yolları:
 
-- **Seç + kısayol:** Gezgin'de veya masaüstünde dosyaları ya da klasörleri seçin, **Ctrl+Shift+D**'ye basın, çarkta seçeneğe tıklayın (orada da Shift / Ctrl / Alt çark değiştirir).
-- **Sağ tık:** dosyalara veya klasörlere sağ tıklayın › **FastShot çarkı** (Windows 11'de önce **Daha fazla seçenek göster**).
-- **Bildirim alanı menüsü:** FastShot › **Dosyaları dönüştür…**
+- **Sağ tık:** dosyalara veya klasörlere sağ tıklayın › **FastShot çarkı** (Windows 11'de önce **Daha fazla seçenek göster**). Açılan çarkta seçeneğe tıklayın; AltGr orada da çark değiştirir.
+- **Bildirim alanı menüsü:** FastShot › **Dosya çarkı…**
 
 Kaynak dosyalar hiçbir zaman değişmez; sonuç her zaman yeni bir dosyadır: `foto (küçük).jpg`, `foto (temiz).jpg`, `foto (kırpılmış).png`, `foto (arka plan).png`, `klip (sessiz).mp4`, `rapor (birleşik).pdf`, tek öğe için `Rapor.zip`, birden çok öğe için `Arşiv.zip`.
 
