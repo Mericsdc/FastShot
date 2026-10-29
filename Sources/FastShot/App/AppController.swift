@@ -19,6 +19,8 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var recordItem: NSMenuItem!
     private var permissionItem: NSMenuItem!
     private var lastCaptureItem: NSMenuItem!
+    private var updateItem: NSMenuItem!
+    private var updateSeparator: NSMenuItem!
     private var capture: CaptureSession?
     private var recording: RecordingSession?
     private var editors: [EditorWindowController] = []
@@ -42,6 +44,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         registerHotkeys()
         DragMonitor.shared.onTrigger = { urls, point, mode in ConversionWheel.shared.show(files: urls, at: point, interactive: false, mode: mode) }
         DragMonitor.shared.onSwitch = { mode in ConversionWheel.shared.switchMode(mode) }
+        DragMonitor.shared.onNext = { ConversionWheel.shared.nextMode() }
         DragMonitor.shared.onDragEnded = { ConversionWheel.shared.dragEnded() }
         DragMonitor.shared.start()
         NSApp.servicesProvider = self
@@ -51,8 +54,14 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
             .sink { [weak self] _ in
                 self?.registerHotkeys()
                 self?.updateMenuShortcuts()
+                self?.statusItem.isVisible = self?.prefs.showMenuBarIcon ?? true
             }
             .store(in: &observers)
+        Updater.shared.objectWillChange
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in DispatchQueue.main.async { self?.updateUpdateItem() } }
+            .store(in: &observers)
+        Updater.shared.start()
         launched = true
         if !prefs.hasCompletedOnboarding {
             prefs.hasCompletedOnboarding = true
@@ -70,7 +79,9 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Opening FastShot again (Finder, Spotlight, Launchpad) shows its settings: the menu bar
     /// icon can hide behind a MacBook's camera notch, so this is the dependable way in.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if !flag { openSettings(tab: .shortcuts) }
+        // Panels such as the translation card count as visible windows, so look at the real ones.
+        let windowOpen = !editors.isEmpty || settingsWindow?.isVisible == true || libraryWindow?.isVisible == true
+        if !windowOpen { openSettings(tab: .shortcuts) }
         return true
     }
 
@@ -348,14 +359,22 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.image = Self.menuBarIcon
         statusItem.button?.toolTip = "FastShot"
+        statusItem.isVisible = prefs.showMenuBarIcon
 
+        // "Güncelle: FastShot 1.3.0" sits at the top while a newer version is out.
+        updateItem = statusMenu.addItem(withTitle: "", action: #selector(installUpdate), keyEquivalent: "")
+        updateItem.image = NSImage(systemSymbolName: "arrow.down.circle.fill", accessibilityDescription: nil)
+        updateSeparator = .separator()
+        statusMenu.addItem(updateSeparator)
         screenshotItem = statusMenu.addItem(withTitle: "Ekran görüntüsü al", action: #selector(takeScreenshot), keyEquivalent: "")
         recordItem = statusMenu.addItem(withTitle: "Alanı videoya kaydet", action: #selector(recordVideo), keyEquivalent: "")
         statusMenu.addItem(.separator())
         lastCaptureItem = statusMenu.addItem(withTitle: "Son yakalamayı düzenle", action: #selector(editLastCapture), keyEquivalent: "")
         statusMenu.addItem(withTitle: "Geçmiş…", action: #selector(showLibrary), keyEquivalent: "")
         statusMenu.addItem(withTitle: "Görüntü veya video aç…", action: #selector(openFile), keyEquivalent: "")
-        statusMenu.addItem(withTitle: "Dosyaları dönüştür…", action: #selector(chooseFilesToConvert), keyEquivalent: "")
+        statusMenu.addItem(withTitle: "FastShot projesi aç…", action: #selector(openProject), keyEquivalent: "")
+        statusMenu.addItem(withTitle: "Dosya çarkı…", action: #selector(chooseFilesToConvert), keyEquivalent: "")
+        statusMenu.addItem(withTitle: "Çeviri…", action: #selector(showTranslation), keyEquivalent: "")
         statusMenu.addItem(.separator())
         permissionItem = statusMenu.addItem(withTitle: "Ekran kaydı iznini ver…", action: #selector(requestPermission), keyEquivalent: "")
         statusMenu.addItem(withTitle: "Ayarlar…", action: #selector(showSettings), keyEquivalent: ",")
@@ -367,6 +386,46 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusMenu.delegate = self
         statusItem.menu = statusMenu
         updateMenuShortcuts()
+        updateUpdateItem()
+    }
+
+    private func updateUpdateItem() {
+        let updater = Updater.shared
+        let show = updater.status == .available || updater.status == .downloading
+        updateItem.isHidden = !show
+        updateSeparator.isHidden = !show
+        updateItem.isEnabled = updater.status == .available
+        if let release = updater.available {
+            updateItem.title = updater.status == .downloading ? "Güncelleme indiriliyor…" : "Güncelle: FastShot \(release.versionString)"
+        }
+    }
+
+    @objc private func installUpdate() { Task { await Updater.shared.install() } }
+
+    @objc func showTranslation() { TranslateCard.show("") }
+
+    /// Opens a `.fastshot` project, also one made by FastShot for Windows (a plain folder there).
+    @objc func openProject() {
+        let panel = NSOpenPanel()
+        let packageType = UTType(filenameExtension: ProjectLibrary.packageExtension, conformingTo: .package) ?? .package
+        panel.allowedContentTypes = [packageType, .folder]
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = true
+        panel.treatsFilePackagesAsDirectories = false
+        panel.message = "Bir FastShot projesi (.fastshot) seçin"
+        NSApp.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard FileManager.default.fileExists(atPath: url.appendingPathComponent("project.json").path) else {
+            Output.showError(CocoaError(.fileReadCorruptFile), title: "Bu klasör bir FastShot projesi değil")
+            return
+        }
+        do {
+            let project = try library.importPackage(at: url)
+            NotificationCenter.default.post(name: .libraryDidChange, object: nil)
+            openEditor(project)
+        } catch {
+            Output.showError(error, title: "Proje açılamadı")
+        }
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
@@ -423,7 +482,9 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         fileMenu.addItem(.separator())
         fileMenu.addItem(withTitle: "Aç…", action: #selector(openFile), keyEquivalent: "o").target = self
         fileMenu.addItem(withTitle: "Geçmiş", action: #selector(showLibrary), keyEquivalent: "l").target = self
-        fileMenu.addItem(withTitle: "Dosyaları dönüştür…", action: #selector(chooseFilesToConvert), keyEquivalent: "").target = self
+        fileMenu.addItem(withTitle: "FastShot projesi aç…", action: #selector(openProject), keyEquivalent: "").target = self
+        fileMenu.addItem(withTitle: "Dosya çarkı…", action: #selector(chooseFilesToConvert), keyEquivalent: "").target = self
+        fileMenu.addItem(withTitle: "Çeviri…", action: #selector(showTranslation), keyEquivalent: "").target = self
         fileMenu.addItem(.separator())
         fileMenu.addItem(withTitle: "Kapat", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         main.addItem(withTitle: "Dosya", action: nil, keyEquivalent: "").submenu = fileMenu

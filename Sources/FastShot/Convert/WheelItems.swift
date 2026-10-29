@@ -15,6 +15,12 @@ enum WheelMode: Int, CaseIterable, Identifiable {
         }
     }
 
+    /// The key shown on the mode bar: the wheel's own key, or the single key that steps through all of them.
+    @MainActor var glyph: String {
+        let prefs = Preferences.shared
+        return prefs.wheelKeyMode == .single ? prefs.singleWheelKey.glyph : modifier.glyph
+    }
+
     @MainActor var modifier: ConvertModifier {
         let prefs = Preferences.shared
         switch self {
@@ -67,6 +73,7 @@ extension FileTool {
         case .compress: return "Sıkıştır"
         case .metadata: return "Meta veri"
         case .recognizeText: return "Metin"
+        case .translate: return "Çevir"
         case .removeAudio: return "Sesi kaldır"
         case .mergePDF: return "Birleştir"
         }
@@ -80,6 +87,7 @@ extension FileTool {
         case .compress: return "Küçült"
         case .metadata: return "Konumu sil"
         case .recognizeText: return "OCR · kopyala"
+        case .translate: return "Metni çevir"
         case .removeAudio: return nil
         case .mergePDF: return "Tek PDF"
         }
@@ -93,6 +101,7 @@ extension FileTool {
         case .compress: return "arrow.down.right.and.arrow.up.left"
         case .metadata: return "location.slash"
         case .recognizeText: return "text.viewfinder"
+        case .translate: return "translate"
         case .removeAudio: return "speaker.slash"
         case .mergePDF: return "doc.on.doc"
         }
@@ -106,6 +115,7 @@ extension FileTool {
         case .compress: return .green
         case .metadata: return .red
         case .recognizeText: return .teal
+        case .translate: return .cyan
         case .removeAudio: return .pink
         case .mergePDF: return .indigo
         }
@@ -120,7 +130,7 @@ extension FileTool {
         case .removeAudio: return "sesi kaldırıldı"
         case .mergePDF: return "PDF'ler birleştirildi"
         case .crop: return "kırpıldı"
-        case .edit, .recognizeText: return ""
+        case .edit, .recognizeText, .translate: return ""
         }
     }
 }

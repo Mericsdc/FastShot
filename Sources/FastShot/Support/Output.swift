@@ -82,7 +82,23 @@ enum Output {
         (NSSound(contentsOfFile: path, byReference: true) ?? NSSound(named: "Tink"))?.play()
     }
 
+    /// Unexpected errors go to ~/Library/Logs/FastShot/errors.log as well, for troubleshooting.
+    static func log(_ message: String) {
+        let folder = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/FastShot", isDirectory: true)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let file = folder.appendingPathComponent("errors.log")
+        let line = "\(ISO8601DateFormatter().string(from: Date())) \(message)\n"
+        if let handle = try? FileHandle(forWritingTo: file) {
+            handle.seekToEndOfFile()
+            handle.write(Data(line.utf8))
+            try? handle.close()
+        } else {
+            try? Data(line.utf8).write(to: file)
+        }
+    }
+
     static func showError(_ error: Error, title: String = "İşlem tamamlanamadı") {
+        log("\(title): \(error.localizedDescription) [\((error as NSError).domain) \((error as NSError).code)]")
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = title

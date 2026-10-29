@@ -70,10 +70,14 @@ final class ConversionWheel: NSObject, NSWindowDelegate {
         self.model = model
     }
 
-    /// Another wheel's key was tapped while this one is open.
+    /// A wheel key was tapped while the wheel is open: its own wheel, or the next one when it is already showing.
     func switchMode(_ mode: WheelMode) {
-        model?.select(mode)
+        guard let model else { return }
+        if model.mode == mode { model.selectNext() } else { model.select(mode) }
     }
+
+    /// The single wheel key was tapped again.
+    func nextMode() { model?.selectNext() }
 
     /// The mouse went up; give a drop on the wheel time to arrive before closing it.
     func dragEnded() {
@@ -165,6 +169,13 @@ final class WheelModel: ObservableObject {
         NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
     }
 
+    /// Steps to the next wheel that has something to offer.
+    func selectNext() {
+        let order = WheelMode.allCases
+        let start = order.firstIndex(of: mode) ?? 0
+        if let next = (1..<order.count).map({ order[(start + $0) % order.count] }).first(where: isAvailable) { select(next) }
+    }
+
     var sourceLabel: String {
         let extensions = Set(files.map { $0.pathExtension.uppercased() })
         if extensions.count == 1, let ext = extensions.first, !ext.isEmpty { return ext }
@@ -241,6 +252,7 @@ final class WheelContainerView: NSView {
     private var springPill: Int?
     private var springTask: Task<Void, Never>?
     private var previousFlags: NSEvent.ModifierFlags = []
+    private var singleWasDown = false
 
     init(model: WheelModel) {
         self.model = model
@@ -377,12 +389,22 @@ final class WheelContainerView: NSView {
         if event.keyCode == 53 { onCancel?() } else { super.keyDown(with: event) }
     }
 
-    /// In a clicked wheel, tapping ⇧ / ⌘ / ⌃ switches wheels just like during a drag.
+    /// In a clicked wheel, the wheel keys switch wheels just like during a drag.
     override func flagsChanged(with event: NSEvent) {
-        let flags = event.modifierFlags.intersection([.shift, .command, .control, .option])
-        let pressed = flags.subtracting(previousFlags)
-        previousFlags = flags
-        if let mode = WheelMode.allCases.first(where: { pressed.contains($0.modifier.flag) }) { model.select(mode) }
+        let flags = event.modifierFlags
+        let prefs = Preferences.shared
+        if prefs.wheelKeyMode == .single {
+            let down = prefs.singleWheelKey.isDown(flags)
+            if down, !singleWasDown { model.selectNext() }
+            singleWasDown = down
+            return
+        }
+        let current = flags.intersection([.shift, .command, .control, .option])
+        let pressed = current.subtracting(previousFlags)
+        previousFlags = current
+        if let mode = WheelMode.allCases.first(where: { pressed.contains($0.modifier.flag) }) {
+            if model.mode == mode { model.selectNext() } else { model.select(mode) }
+        }
     }
 }
 
@@ -433,7 +455,7 @@ private struct ModeBar: View {
                 let available = model.isAvailable(mode)
                 Button { model.select(mode) } label: {
                     HStack(spacing: 7) {
-                        Text(mode.modifier.glyph)
+                        Text(mode.glyph)
                             .font(.system(size: 12, weight: .semibold))
                             .frame(width: 22, height: 20)
                             .background(RoundedRectangle(cornerRadius: 5, style: .continuous)
@@ -448,7 +470,7 @@ private struct ModeBar: View {
                 .buttonStyle(.plain)
                 .disabled(!available)
                 .opacity(available ? 1 : 0.35)
-                .help(available ? "\(mode.title) (\(mode.modifier.glyph))" : "Bu dosyalar için \(mode.title.lowercased()) yok")
+                .help(available ? "\(mode.title) (\(mode.glyph))" : "Bu dosyalar için \(mode.title.lowercased()) yok")
             }
         }
         .padding(WheelGeometry.barPadding)

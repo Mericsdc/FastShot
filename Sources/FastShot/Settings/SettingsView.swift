@@ -3,7 +3,7 @@ import FastShotCore
 import ServiceManagement
 import SwiftUI
 
-enum SettingsTab: Hashable { case general, shortcuts, saving, video, convert }
+enum SettingsTab: Hashable { case general, shortcuts, saving, video, convert, translate }
 
 @MainActor
 final class SettingsRouter: ObservableObject {
@@ -20,6 +20,12 @@ struct SettingsView: View {
     @State private var system = SystemScreenshotShortcuts.states()
     @State private var takenOver = SystemScreenshotShortcuts.isTakenOver
     @State private var working = false
+    @ObservedObject private var updater = Updater.shared
+    @State private var deepLSaved = DeepLKey.value != nil
+    @State private var changingKey = false
+    @State private var keyInput = ""
+    @State private var keyState = ""
+    @State private var testingKey = false
 
     var body: some View {
         TabView(selection: $router.tab) {
@@ -28,6 +34,7 @@ struct SettingsView: View {
             saving.tabItem { Label("Kaydetme", systemImage: "square.and.arrow.down") }.tag(SettingsTab.saving)
             video.tabItem { Label("Video", systemImage: "video") }.tag(SettingsTab.video)
             convert.tabItem { Label("Dosya çarkı", systemImage: "arrow.triangle.2.circlepath") }.tag(SettingsTab.convert)
+            translation.tabItem { Label("Çeviri", systemImage: "translate") }.tag(SettingsTab.translate)
         }
         .padding(18)
         .frame(width: 600, height: 640)
@@ -52,6 +59,11 @@ struct SettingsView: View {
                 }
             Toggle("Seçim yaparken büyüteci göster", isOn: $prefs.showMagnifier)
             Toggle("Ses efektlerini çal", isOn: $prefs.playSounds)
+            Toggle("Simgeyi menü çubuğunda göster", isOn: $prefs.showMenuBarIcon)
+            if !prefs.showMenuBarIcon {
+                Text("FastShot çalışmaya devam eder. Ayarlara dönmek için FastShot'ı Uygulamalar'dan veya Spotlight'tan yeniden açın.")
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+            }
             LabeledContent("Ekran kaydı izni") {
                 HStack {
                     Image(systemName: hasPermission ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
@@ -66,9 +78,117 @@ struct SettingsView: View {
             LabeledContent("Geçmiş") {
                 Button("Geçmiş klasörünü göster") { NSWorkspace.shared.open(ProjectLibrary.defaultRoot) }
             }
+            Section("Güncellemeler") {
+                LabeledContent("Sürüm") {
+                    HStack {
+                        Text(Updater.currentVersionString).monospacedDigit()
+                        Text(updateStatus).foregroundStyle(.secondary)
+                        if updater.status == .available {
+                            Button("Güncelle") { Task { await Updater.shared.install() } }.buttonStyle(.borderedProminent)
+                        } else {
+                            Button("Şimdi denetle") { Task { await Updater.shared.check(userAsked: true) } }
+                                .disabled(updater.status == .checking || updater.status == .downloading)
+                        }
+                    }
+                }
+                Toggle("Güncellemeleri otomatik denetle", isOn: $prefs.checkForUpdates)
+                if !Updater.isInstalled {
+                    Text("Bu kopya Uygulamalar klasörü dışında çalışıyor; kendini güncellemez.").font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+                Button("Sürüm notları") { NSWorkspace.shared.open(Updater.releasesPage) }.buttonStyle(.link)
+            }
+            Section {
+                Button("FastShot'tan çık", role: .destructive) { NSApp.terminate(nil) }
+            }
         }
         .formStyle(.grouped)
         .onAppear { hasPermission = Permissions.hasScreenRecording }
+    }
+
+    private var updateStatus: String {
+        switch updater.status {
+        case .idle: return ""
+        case .checking: return "Denetleniyor…"
+        case .upToDate: return "Güncel"
+        case .available: return "Yeni sürüm: \(updater.available?.versionString ?? "")"
+        case .downloading: return "İndiriliyor…"
+        case .failed: return updater.error ?? "Denetlenemedi"
+        }
+    }
+
+    private var translation: some View {
+        Form {
+            Section {
+                Picker("Motor", selection: $prefs.translateEngine) {
+                    ForEach(TranslateEngine.allCases) { Text($0.title).tag($0) }
+                }
+                Picker("Hedef dil", selection: $prefs.translateTarget) {
+                    ForEach(TranslationLanguages.all) { Text($0.name).tag($0.code) }
+                }
+            } footer: {
+                Text("Seçim ekranında \"Metni tanı ve çevir\" (⇧⌘T), dosya çarkında Araçlar › Çevir ya da menü çubuğunda \"Çeviri…\". Ekrandan tanınan satırlar çeviriden önce paragraf olarak birleştirilir.")
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+            }
+            Section("Çevrimdışı çeviri") {
+                Text("Apple'ın çeviri motoru bu Mac'te çalışır: anahtar ve hesap gerekmez, metin Mac'ten çıkmaz. Bir dil ilk kez gerektiğinde macOS onu indirmeyi önerir; indirilen dilleri Sistem Ayarları › Genel › Dil ve Bölge › Çeviri Dilleri'nden yönetebilirsiniz.")
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                Button("Çeviri dillerini yönet") {
+                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Localization-Settings.extension")!)
+                }
+            }
+            Section("DeepL") {
+                if deepLSaved && !changingKey {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.accentColor)
+                        Text(prefs.translateEngine == .deepL ? "API anahtarı girildi, DeepL kullanabilirsiniz." :
+                                "API anahtarı girildi. DeepL'i kullanmak için yukarıda motoru \"DeepL\" yapın.").fontWeight(.semibold)
+                        Spacer()
+                        Button("Değiştir") { changingKey = true; keyState = "" }
+                        Button("Sil") {
+                            DeepLKey.value = nil
+                            deepLSaved = false
+                            if prefs.translateEngine == .deepL { prefs.translateEngine = .offline }
+                            keyState = "Anahtar silindi; çeviriler bu Mac'teki motorla yapılır."
+                        }
+                    }
+                } else {
+                    LabeledContent("API anahtarı") {
+                        HStack {
+                            SecureField("", text: $keyInput).frame(minWidth: 220)
+                            Button(testingKey ? "Deneniyor…" : "Kaydet ve dene") { saveDeepLKey() }
+                                .disabled(keyInput.trimmingCharacters(in: .whitespaces).isEmpty || testingKey)
+                            if changingKey { Button("Vazgeç") { changingKey = false; keyInput = ""; keyState = "" } }
+                        }
+                    }
+                }
+                if !keyState.isEmpty { Text(keyState).font(.system(size: 11)).foregroundStyle(.secondary) }
+                Button("Ücretsiz DeepL anahtarı al") { NSWorkspace.shared.open(URL(string: "https://www.deepl.com/pro-api")!) }
+                Text("Daha yüksek kalite için: DeepL'in ücretsiz planı (ayda 500.000 karakter) için deepl.com'dan bir anahtar alıp buraya yapıştırın. Anahtar yalnızca bu Mac'te, Anahtar Zinciri'nde saklanır; çeviriler sizin hesabınızdan gider. Anahtar yokken ya da motor \"Çevrimdışı\"yken bu Mac'teki motor kullanılır.")
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    /// Tries the key with a tiny translation before keeping it.
+    private func saveDeepLKey() {
+        let key = keyInput
+        testingKey = true
+        keyState = "Anahtar deneniyor…"
+        Task {
+            do {
+                _ = try await DeepL.translate("Merhaba", from: "tr", to: "en", key: key)
+                DeepLKey.value = key
+                deepLSaved = true
+                changingKey = false
+                keyInput = ""
+                keyState = ""
+                prefs.translateEngine = .deepL
+            } catch {
+                keyState = error.localizedDescription
+            }
+            testingKey = false
+        }
     }
 
     private var shortcuts: some View {
@@ -122,14 +242,25 @@ struct SettingsView: View {
         Form {
             Section {
                 Toggle("Dosya sürüklerken çarkı aç", isOn: $prefs.convertEnabled)
-                ForEach(WheelMode.allCases) { mode in
-                    Picker("\(mode.title) çarkı", selection: modifierBinding(for: mode)) {
-                        ForEach(ConvertModifier.allCases) { Text($0.title).tag($0) }
+                Picker("Tuşlar", selection: $prefs.wheelKeyMode) {
+                    ForEach(WheelKeyMode.allCases) { Text($0.title).tag($0) }
+                }
+                .disabled(!prefs.convertEnabled)
+                if prefs.wheelKeyMode == .single {
+                    Picker("Çarkı açan tuş", selection: $prefs.singleWheelKey) {
+                        ForEach(SingleWheelKey.allCases) { Text($0.title).tag($0) }
                     }
                     .disabled(!prefs.convertEnabled)
+                } else {
+                    ForEach(WheelMode.allCases) { mode in
+                        Picker("\(mode.title) çarkı", selection: modifierBinding(for: mode)) {
+                            ForEach(ConvertModifier.allCases) { Text($0.title).tag($0) }
+                        }
+                        .disabled(!prefs.convertEnabled)
+                    }
                 }
             } footer: {
-                Text("Dosyaları sürüklerken bir tuşa bir kez basın; imlecin etrafında o çark açılır, seçeneğin üzerine bırakın. Çark açıkken başka bir tuşa basarak ya da üstteki çubuğun üzerinde bekleyerek çarklar arasında geçebilirsiniz. Sürüklemeden kullanmak için Finder'da dosyaları seçip \(prefs.convertHotkey?.displayString ?? "kısayola") basın ya da sağ tık (izleme dörtgeninde iki parmakla tıklama veya Control + tıklama) › Hizmetler › FastShot çarkı.")
+                Text("Dosyaları sürüklerken bir tuşa bir kez basın; imlecin etrafında o çark açılır, seçeneğin üzerine bırakın. Aynı tuşa tekrar bastıkça sıradaki çarka geçilir; üstteki çubuğun üzerinde bir an beklemek de o çarkı açar. Bir çarkta seçenek yoksa sıradaki açılır. Tek tuş modunda sağ ⌥ (Mac'teki AltGr) yalnızca dosya sürüklerken çark açar, yazı yazmayı etkilemez. Sürüklemeden kullanmak için Finder'da dosyaları seçip \(prefs.convertHotkey?.displayString ?? "kısayola") basın ya da sağ tık (izleme dörtgeninde iki parmakla tıklama veya Control + tıklama) › Hizmetler › FastShot çarkı.")
                     .font(.system(size: 11)).foregroundStyle(.secondary)
             }
             Section {

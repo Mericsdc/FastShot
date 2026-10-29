@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 
 /// Changes a file's content without changing its kind.
 public enum FileTool: String, CaseIterable, Sendable {
-    case edit, crop, background, compress, metadata, recognizeText, removeAudio, mergePDF
+    case edit, crop, background, compress, metadata, recognizeText, translate, removeAudio, mergePDF
 }
 
 /// Does something with files as they are.
@@ -25,7 +25,7 @@ public enum FileTools {
         let single = urls.count == 1
         switch family {
         case .image:
-            return single ? [.edit, .crop, .background, .compress, .metadata, .recognizeText] : [.edit, .background, .compress, .metadata]
+            return single ? [.edit, .crop, .background, .compress, .metadata, .recognizeText, .translate] : [.edit, .background, .compress, .metadata]
         case .video:
             return (single ? [.edit] : []) + [.compress, .removeAudio, .metadata]
         case .audio:

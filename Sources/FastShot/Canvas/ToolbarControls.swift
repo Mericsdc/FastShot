@@ -99,7 +99,7 @@ struct SizePicker: View {
             Button { tools.size = index } label: {
                 Circle()
                     .fill(tools.size == index ? Color.accentColor : Color.primary.opacity(0.75))
-                    .frame(width: 4 + CGFloat(index) * 3, height: 4 + CGFloat(index) * 3)
+                    .frame(width: 3 + CGFloat(index) * 2.5, height: 3 + CGFloat(index) * 2.5)
                     .frame(width: dotWidth, height: 18)
                     .contentShape(Rectangle())
             }

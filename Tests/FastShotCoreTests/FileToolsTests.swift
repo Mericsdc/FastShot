@@ -19,7 +19,7 @@ final class FileToolsTests: XCTestCase {
 
     func testWhichToolsAndActionsApply() {
         let jpg = folder.appendingPathComponent("a.jpg"), pdf1 = folder.appendingPathComponent("a.pdf"), pdf2 = folder.appendingPathComponent("b.pdf")
-        XCTAssertEqual(FileTools.tools(for: [jpg]), [.edit, .crop, .background, .compress, .metadata, .recognizeText])
+        XCTAssertEqual(FileTools.tools(for: [jpg]), [.edit, .crop, .background, .compress, .metadata, .recognizeText, .translate])
         XCTAssertTrue(FileTools.tools(for: [pdf1, pdf2]).contains(.mergePDF))
         XCTAssertFalse(FileTools.tools(for: [pdf1]).contains(.mergePDF))
         XCTAssertEqual(FileTools.tools(for: [jpg, pdf1]), [])

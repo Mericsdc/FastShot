@@ -17,17 +17,22 @@ rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$binary_dir/FastShot" "$app/Contents/MacOS/FastShot"
 cp Resources/Info.plist "$app/Contents/Info.plist"
+# FASTSHOT_VERSION=1.2.3 stamps a release version (the build number follows it: 1.2.3 → 10203).
+if [[ -n "${FASTSHOT_VERSION:-}" ]]; then
+  parts=(${(s:.:)FASTSHOT_VERSION})
+  plutil -replace CFBundleShortVersionString -string "$FASTSHOT_VERSION" "$app/Contents/Info.plist"
+  plutil -replace CFBundleVersion -string "$(( parts[1] * 10000 + parts[2] * 100 + parts[3] ))" "$app/Contents/Info.plist"
+fi
 
-# App icon, regenerated only when the drawing script changes.
-icon_png="build/AppIcon-1024.png"
-if [[ ! -f Resources/AppIcon.icns || scripts/make-icon.swift -nt Resources/AppIcon.icns ]]; then
-  mkdir -p build
-  swift scripts/make-icon.swift "$icon_png"
+# App icon from the shared logo (Resources/AppIcon.png, the same one FastShot for Windows uses),
+# regenerated only when the logo changes.
+logo="Resources/AppIcon.png"
+if [[ ! -f Resources/AppIcon.icns || "$logo" -nt Resources/AppIcon.icns ]]; then
   iconset="build/AppIcon.iconset"
   rm -rf "$iconset" && mkdir -p "$iconset"
   for size in 16 32 128 256 512; do
-    sips -z $size $size "$icon_png" --out "$iconset/icon_${size}x${size}.png" >/dev/null
-    sips -z $((size * 2)) $((size * 2)) "$icon_png" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
+    sips -z $size $size "$logo" --out "$iconset/icon_${size}x${size}.png" >/dev/null
+    sips -z $((size * 2)) $((size * 2)) "$logo" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
   done
   iconutil -c icns "$iconset" -o Resources/AppIcon.icns
 fi

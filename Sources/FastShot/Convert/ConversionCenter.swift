@@ -64,6 +64,9 @@ final class ConversionCenter {
                     Output.showError(error, title: "Metin tanınamadı")
                 }
             }
+        case .translate:
+            guard let url = urls.first, let image = ImageExporter.load(url) else { return }
+            CaptureSession.translate(image)
         case .compress:
             enqueue(Job(title: "Sıkıştırılıyor", done: tool.doneText, urls: urls, together: false) { batch, folder, progress in
                 [try await FileTools.compress(batch[0], folder: folder, progress: progress)]

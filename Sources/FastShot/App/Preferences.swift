@@ -30,6 +30,49 @@ enum ConvertModifier: String, CaseIterable, Identifiable {
     }
 }
 
+/// How the wheel keys work while dragging: one key per wheel, or one key that steps through them.
+enum WheelKeyMode: String, CaseIterable, Identifiable {
+    case separate, single
+    var id: String { rawValue }
+    var title: String { self == .separate ? "Her çarka ayrı tuş" : "Tek tuş (bastıkça sıradaki çark)" }
+}
+
+/// The key of the single-key mode. Right Option is the Mac's AltGr: it never interferes with ⇧ / ⌘ / ⌃ shortcuts.
+enum SingleWheelKey: String, CaseIterable, Identifiable {
+    case rightOption, shift, control, option, command
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .rightOption: return "Sağ ⌥ Option"
+        case .shift: return "⇧ Shift"
+        case .control: return "⌃ Control"
+        case .option: return "⌥ Option"
+        case .command: return "⌘ Command"
+        }
+    }
+    var glyph: String {
+        switch self {
+        case .rightOption: return "⌥"
+        case .shift: return "⇧"
+        case .control: return "⌃"
+        case .option: return "⌥"
+        case .command: return "⌘"
+        }
+    }
+    /// Device-dependent bit for the right Option key (NX_DEVICERALTKEYMASK).
+    static let rightOptionMask: UInt = 0x40
+
+    func isDown(_ flags: NSEvent.ModifierFlags) -> Bool {
+        switch self {
+        case .rightOption: return flags.contains(.option) && flags.rawValue & Self.rightOptionMask != 0
+        case .shift: return flags.contains(.shift)
+        case .control: return flags.contains(.control)
+        case .option: return flags.contains(.option)
+        case .command: return flags.contains(.command)
+        }
+    }
+}
+
 enum ConvertDestination: String, CaseIterable, Identifiable {
     case beside, downloads, custom
     var id: String { rawValue }
@@ -77,6 +120,13 @@ final class Preferences: ObservableObject {
     @Published var convertDestination: ConvertDestination { didSet { defaults.set(convertDestination.rawValue, forKey: "convert.destination") } }
     @Published var convertFolder: String { didSet { defaults.set(convertFolder, forKey: "convert.folder") } }
     @Published var revealAfterConvert: Bool { didSet { defaults.set(revealAfterConvert, forKey: "convert.reveal") } }
+
+    @Published var wheelKeyMode: WheelKeyMode { didSet { defaults.set(wheelKeyMode.rawValue, forKey: "convert.wheelKeyMode") } }
+    @Published var singleWheelKey: SingleWheelKey { didSet { defaults.set(singleWheelKey.rawValue, forKey: "convert.singleWheelKey") } }
+    @Published var translateEngine: TranslateEngine { didSet { defaults.set(translateEngine.rawValue, forKey: "translate.engine") } }
+    @Published var translateTarget: String { didSet { defaults.set(translateTarget, forKey: "translate.target") } }
+    @Published var checkForUpdates: Bool { didSet { defaults.set(checkForUpdates, forKey: "general.checkForUpdates") } }
+    @Published var showMenuBarIcon: Bool { didSet { defaults.set(showMenuBarIcon, forKey: "general.menuBarIcon") } }
 
     /// Seconds a mark drawn in the video editor stays visible; 0 means until the end.
     @Published var annotationLength: Double { didSet { defaults.set(annotationLength, forKey: "video.annotationLength") } }
@@ -127,6 +177,12 @@ final class Preferences: ObservableObject {
         convertDestination = ConvertDestination(rawValue: defaults.string(forKey: "convert.destination") ?? "") ?? .beside
         convertFolder = defaults.string(forKey: "convert.folder") ?? home.appendingPathComponent("Downloads").path
         revealAfterConvert = defaults.object(forKey: "convert.reveal") as? Bool ?? false
+        wheelKeyMode = WheelKeyMode(rawValue: defaults.string(forKey: "convert.wheelKeyMode") ?? "") ?? .separate
+        singleWheelKey = SingleWheelKey(rawValue: defaults.string(forKey: "convert.singleWheelKey") ?? "") ?? .rightOption
+        translateEngine = TranslateEngine(rawValue: defaults.string(forKey: "translate.engine") ?? "") ?? .offline
+        translateTarget = defaults.string(forKey: "translate.target") ?? "tr"
+        checkForUpdates = defaults.object(forKey: "general.checkForUpdates") as? Bool ?? true
+        showMenuBarIcon = defaults.object(forKey: "general.menuBarIcon") as? Bool ?? true
     }
 
     func resetShortcuts() {

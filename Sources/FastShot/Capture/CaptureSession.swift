@@ -181,6 +181,28 @@ final class CaptureSession {
         }
     }
 
+    func translateText() {
+        guard let crop = activeView?.croppedImage() else { return }
+        finish(restoreFocus: false)
+        Self.translate(crop)
+    }
+
+    /// Recognises the text in `image` and opens the translation card with it.
+    static func translate(_ image: CGImage) {
+        Task {
+            do {
+                let text = try await TextRecognizer.recognize(image)
+                if text.isEmpty {
+                    Toast.show("Metin bulunamadı", symbol: "translate")
+                } else {
+                    TranslateCard.show(text)
+                }
+            } catch {
+                Output.showError(error, title: "Metin tanınamadı")
+            }
+        }
+    }
+
     func record() {
         guard let view = activeView, let rect = view.selection else { return }
         let request = RecordRequest(screen: view.shot.screen, displayID: view.shot.displayID, rect: rect)

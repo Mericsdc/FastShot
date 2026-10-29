@@ -131,6 +131,11 @@ final class RecordingSession: NSObject {
         recordingConfiguration.outputURL = library.mediaURL(project)
         recordingConfiguration.outputFileType = .mp4
         recordingConfiguration.videoCodecType = prefs.videoCodec == .hevc ? .hevc : .h264
+        // With both sources on, put system sound and microphone in one track (macOS 27+), like on Windows.
+        let mixSelector = NSSelectorFromString("setMixesAudioWithMicrophone:")
+        if prefs.recordSystemAudio, prefs.recordMicrophone, recordingConfiguration.responds(to: mixSelector) {
+            recordingConfiguration.setValue(true, forKey: "mixesAudioWithMicrophone")
+        }
         let output = SCRecordingOutput(configuration: recordingConfiguration, delegate: self)
         let stream = SCStream(filter: filter, configuration: configuration, delegate: self)
         try stream.addRecordingOutput(output)

@@ -424,6 +424,10 @@ final class OverlayView: NSView {
             default: break
             }
         }
+        if modifiers == [.command, .shift], key == "t", !isVideo {
+            session.translateText()
+            return true
+        }
         if modifiers == [.command, .shift], key == "s", !isVideo {
             session.saveAs()
             return true
@@ -468,7 +472,7 @@ final class OverlayView: NSView {
         let actions = OverlayActions(
             copy: { [weak self] in self?.session.copy() }, save: { [weak self] in self?.session.save() },
             saveAs: { [weak self] in self?.session.saveAs() }, pin: { [weak self] in self?.session.pin() },
-            recognizeText: { [weak self] in self?.session.recognizeText() }, edit: { [weak self] in self?.session.openEditor() },
+            recognizeText: { [weak self] in self?.session.recognizeText() }, translate: { [weak self] in self?.session.translateText() }, edit: { [weak self] in self?.session.openEditor() },
             record: { [weak self] in self?.session.record() }, cancel: { [weak self] in self?.session.cancel() })
         let bar = ChromeHostingView(rootView: OverlayActionBar(mode: session.mode, actions: actions))
         addSubview(bar)
@@ -533,6 +537,7 @@ struct OverlayActions {
     let saveAs: () -> Void
     let pin: () -> Void
     let recognizeText: () -> Void
+    let translate: () -> Void
     let edit: () -> Void
     let record: () -> Void
     let cancel: () -> Void
@@ -553,7 +558,7 @@ struct OverlayToolPalette: View {
             Divider().frame(width: 56)
             ColorSwatches(tools: tools, colors: Array(RGBAColor.palette.prefix(8)), columns: 4, swatch: 10)
             Divider().frame(width: 56)
-            SizePicker(tools: tools, axis: .horizontal, dotWidth: 16)
+            SizePicker(tools: tools, axis: .horizontal, dotWidth: 13)
             HStack(spacing: 1) {
                 IconButton(symbol: tools.filled ? "square.fill" : "square", help: "Dolgulu şekil / etiket", selected: tools.filled, size: 22) { tools.filled.toggle() }
                 IconButton(symbol: "arrow.uturn.backward", help: "Geri al (⌘Z)", size: 22, action: undo).disabled(!tools.canUndo)
@@ -580,6 +585,7 @@ struct OverlayActionBar: View {
                 separator
                 IconButton(symbol: "pin", help: "Ekrana sabitle (⌘P)", action: actions.pin)
                 IconButton(symbol: "text.viewfinder", help: "Metni tanı ve kopyala (⌘T)", action: actions.recognizeText)
+                IconButton(symbol: "translate", help: "Metni tanı ve çevir (⇧⌘T)", action: actions.translate)
                 IconButton(symbol: "slider.horizontal.below.rectangle", help: "Düzenleyicide aç (⌘E)", action: actions.edit)
                 IconButton(symbol: "record.circle", help: "Bu alanı videoya kaydet (⌘R)", tint: .red, action: actions.record)
                 separator

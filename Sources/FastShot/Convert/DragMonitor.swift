@@ -11,6 +11,8 @@ final class DragMonitor {
     var onTrigger: (([URL], CGPoint, WheelMode) -> Void)?
     /// Later taps in the same drag: switch the open wheel.
     var onSwitch: ((WheelMode) -> Void)?
+    /// The single wheel key was tapped again.
+    var onNext: (() -> Void)?
     var onDragEnded: (() -> Void)?
 
     private let pasteboard = NSPasteboard(name: .drag)
@@ -44,7 +46,11 @@ final class DragMonitor {
             return
         }
         let flags = NSEvent.modifierFlags
-        let pressed = Set(WheelMode.allCases.filter { flags.contains($0.modifier.flag) })
+        let prefs = Preferences.shared
+        // Single-key mode: one key opens the Convert wheel, then steps through the wheels.
+        let single = prefs.wheelKeyMode == .single
+        let pressed: Set<WheelMode> = single ? (prefs.singleWheelKey.isDown(flags) ? [.convert] : [])
+                                             : Set(WheelMode.allCases.filter { flags.contains($0.modifier.flag) })
         defer { previouslyDown = pressed }
         if !mouseDown {
             mouseDown = true
@@ -52,10 +58,10 @@ final class DragMonitor {
             return
         }
         // React to a key going down during a file drag, not to a key held before the drag.
-        guard Preferences.shared.convertEnabled, pasteboard.changeCount != idleChangeCount,
+        guard prefs.convertEnabled, pasteboard.changeCount != idleChangeCount,
               let mode = WheelMode.allCases.first(where: { pressed.contains($0) && !previouslyDown.contains($0) }) else { return }
         if triggered {
-            onSwitch?(mode)
+            if single { onNext?() } else { onSwitch?(mode) }
             return
         }
         let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []

@@ -65,9 +65,9 @@ enum StyleChange { case color, size, filled }
 /// style while a mark is selected restyles that mark.
 @MainActor
 final class ToolState: ObservableObject {
-    static let lineWidths: [Double] = [2, 4, 7, 12]
-    static let fontSizes: [Double] = [14, 20, 28, 40]
-    static let sizeNames = ["İnce", "Orta", "Kalın", "Çok kalın"]
+    static let lineWidths: [Double] = [1, 2, 3, 5, 8]
+    static let fontSizes: [Double] = [12, 14, 20, 28, 40]
+    static let sizeNames = ["Çok ince", "İnce", "Orta", "Kalın", "Çok kalın"]
 
     @Published var tool: EditorTool
     @Published var color: RGBAColor { didSet { styleDidChange(.color) } }
