@@ -2,7 +2,7 @@
 
 macOS için menü çubuğunda çalışan hızlı ekran görüntüsü ve ekran kaydı aracı. Alan seç, üzerine çiz, kopyala veya kaydet; ya da seçtiğin alanı videoya kaydet. Tüm çizimler katman olarak saklanır, istediğin zaman yeniden açıp düzenleyebilirsin.
 
-**Windows:** Windows 10/11 sürümü [windows/](windows) klasöründe. Hazır exe: [Releases](https://github.com/Mericsdc/FastShot/releases) › **FastShot for Windows** › `FastShot-Windows-x64.exe`.
+**Windows:** Windows 10/11 sürümü [windows/](windows) klasöründe. Kurulum: [Releases](https://github.com/Mericsdc/FastShot/releases) › en yeni **FastShot for Windows** › `FastShot-Setup-x64.exe`.
 
 ## Kısayollar
 

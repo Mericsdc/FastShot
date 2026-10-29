@@ -1,4 +1,5 @@
-# Builds FastShot for Windows (windows/) and publishes FastShot-Windows-x64.exe
+# Builds FastShot for Windows (windows/) and publishes FastShot-Setup-x64.exe
+# (the app, which installs itself; installed copies update from these releases)
 # as a GitHub release whenever a windows-v* tag is pushed:
 #
 #   git tag -a windows-v1.1.0 -m "Release notes, shown on the release page"
@@ -49,7 +50,7 @@ jobs:
           "version=$version" >> $env:GITHUB_OUTPUT
           "FastShot for Windows $version" >> $env:GITHUB_STEP_SUMMARY
 
-      - name: Build FastShot-Windows-x64.exe
+      - name: Build FastShot-Setup-x64.exe
         env:
           DOTNET_CLI_TELEMETRY_OPTOUT: '1'
           DOTNET_NOLOGO: '1'
@@ -59,13 +60,13 @@ jobs:
             -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true `
             -p:DebugType=none -p:Version=${{ steps.version.outputs.version }} -o out
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Move-Item out/FastShot.exe out/FastShot-Windows-x64.exe
-          "exe: {0:N1} MB" -f ((Get-Item out/FastShot-Windows-x64.exe).Length / 1MB) >> $env:GITHUB_STEP_SUMMARY
+          Move-Item out/FastShot.exe out/FastShot-Setup-x64.exe
+          "exe: {0:N1} MB" -f ((Get-Item out/FastShot-Setup-x64.exe).Length / 1MB) >> $env:GITHUB_STEP_SUMMARY
 
       - name: Check that it starts
         run: |
           # --embedded runs it without a tray icon; it reports its state on stdout and quits when stdin closes.
-          $start = New-Object System.Diagnostics.ProcessStartInfo (Resolve-Path out/FastShot-Windows-x64.exe)
+          $start = New-Object System.Diagnostics.ProcessStartInfo (Resolve-Path out/FastShot-Setup-x64.exe)
           $start.Arguments = "--embedded $PID"
           $start.UseShellExecute = $false
           $start.RedirectStandardInput = $true
@@ -85,9 +86,9 @@ jobs:
           $tag = '${{ github.ref_name }}'
           gh release view $tag > $null 2>&1
           if ($LASTEXITCODE -eq 0) {
-            gh release upload $tag out/FastShot-Windows-x64.exe --clobber
+            gh release upload $tag out/FastShot-Setup-x64.exe --clobber
           } else {
-            gh release create $tag out/FastShot-Windows-x64.exe --title "FastShot for Windows ${{ steps.version.outputs.version }}" --notes-from-tag --verify-tag
+            gh release create $tag out/FastShot-Setup-x64.exe --title "FastShot for Windows ${{ steps.version.outputs.version }}" --notes-from-tag --verify-tag
           }
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
@@ -95,6 +96,6 @@ jobs:
         if: ${{ !startsWith(github.ref, 'refs/tags/windows-v') || inputs.build_only }}
         uses: actions/upload-artifact@v7
         with:
-          name: FastShot-Windows-x64
-          path: out/FastShot-Windows-x64.exe
+          name: FastShot-Setup-x64
+          path: out/FastShot-Setup-x64.exe
           retention-days: 7

@@ -4,11 +4,16 @@ Windows için görev çubuğunun bildirim alanında (saatin yanında) çalışan
 
 macOS sürümünün (bu deponun kökü, [Mericsdc/FastShot](https://github.com/Mericsdc/FastShot)) Windows 10/11 karşılığıdır. Çizim modeli, düzenleyiciler, zaman çizelgesi ve proje biçimi aynıdır; `.fastshot` projeleri iki sistem arasında taşınabilir.
 
-## İndir
+## Kurulum
 
-Hazır exe: [Releases](https://github.com/Mericsdc/FastShot/releases) › en yeni **FastShot for Windows** sürümü › `FastShot-Windows-x64.exe`. Kurulum gerektirmez ve .NET'i içinde taşır; indirip çift tıklayın. FastShot saatin yanındaki bildirim alanına yerleşir.
+[Releases](https://github.com/Mericsdc/FastShot/releases) › en yeni **FastShot for Windows** › `FastShot-Setup-x64.exe` dosyasını indirip açın. .NET'i içinde taşır, başka bir şey gerekmez.
 
-İmzasız olduğu için Windows ilk açılışta **"Windows bilgisayarınızı korudu"** diyebilir: **Ek bilgi → Yine de çalıştır**.
+- `%LOCALAPPDATA%\Programs\FastShot` klasörüne (C: sürücüsü, yalnızca sizin kullanıcınız için; yönetici izni istemez) kurulur, Başlat menüsüne eklenir ve Windows açılınca başlar. İndirdiğiniz dosya sonra silinebilir.
+- Yeni sürümleri kendisi denetler (açılıştan kısa süre sonra, sonra 6 saatte bir). Yeni sürüm çıkınca bir bildirim ve bildirim alanı menüsünün en üstünde **Güncelle** görünür; tek tıkla indirip kurar ve yeniden açılır. Ayarlar › Genel › Güncellemeler'den elle denetlenir ya da otomatik denetleme kapatılır.
+- Kaldırmak için: Windows Ayarları › Uygulamalar › FastShot › Kaldır. Geçmiş'teki yakalamalar ve ayarlar silinmez.
+- Simgeyi bildirim alanından kaldırmak için: Ayarlar › Genel › "Simgeyi bildirim alanında göster". FastShot çalışmaya devam eder; ayarlara dönmek için Başlat menüsünden yeniden açın.
+
+İmzasız olduğu için Windows kurulum dosyasının ilk açılışında **"Windows bilgisayarınızı korudu"** diyebilir: **Ek bilgi → Yine de çalıştır** (ya da dosyaya sağ tık › Özellikler › **Engellemeyi kaldır**). Kurulu FastShot'ta bu uyarı bir daha çıkmaz.
 
 ## Kısayollar
 
@@ -131,7 +136,7 @@ git tag -a windows-v1.1.0 -m "Bu sürümde neler değişti"
 git push origin windows-v1.1.0
 ```
 
-İş akışı exe'yi derler, `--embedded` ile bir kez açıp kapanabildiğini dener, sonra `FastShot-Windows-x64.exe`'yi sürüme ekler. Aynı etiket yeniden çalışırsa exe değiştirilir. Actions › Windows › "Run workflow" (sadece derle) yayınlamadan dener; exe işin "Artifacts" bölümünden indirilebilir. macOS uygulaması bu iş akışından etkilenmez.
+İş akışı exe'yi derler, `--embedded` ile bir kez açıp kapanabildiğini dener, sonra `FastShot-Setup-x64.exe`'yi sürüme ekler; kurulu FastShot'lar güncellemeyi buradan alır. Aynı etiket yeniden çalışırsa exe değiştirilir. Actions › Windows › "Run workflow" (sadece derle) yayınlamadan dener; exe işin "Artifacts" bölümünden indirilebilir. macOS uygulaması bu iş akışından etkilenmez.
 
 Xloer'in içindeki FastShot bu klasörden kopyalanır: Xloer'de `npm run sync-fastshot`.
 
