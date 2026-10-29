@@ -122,6 +122,19 @@ dotnet test
 
 Uygulama simgesi `src\FastShot\Assets\AppIcon.png` logosudur (1024 px, saydam zemin); `AppIcon.cs` her boyutu ondan çizer, kayıt sırasında tepsi simgesi kırmızı bir durdur işaretine döner. Logoyu değiştirince `scripts\make-icon.ps1` exe'ye gömülen `Assets\AppIcon.ico` dosyasını yeniden üretir.
 
+## Sürüm çıkarmak
+
+Yeni bir `windows-v*` etiketi GitHub Actions'ta exe'yi derleyip yayınlar (`.github/workflows/windows.yml`). Etiketin mesajı sürüm notu olur, etiketteki sürüm exe'ye yazılır:
+
+```powershell
+git tag -a windows-v1.1.0 -m "Bu sürümde neler değişti"
+git push origin windows-v1.1.0
+```
+
+İş akışı exe'yi derler, `--embedded` ile bir kez açıp kapanabildiğini dener, sonra `FastShot-Windows-x64.exe`'yi sürüme ekler. Aynı etiket yeniden çalışırsa exe değiştirilir. Actions › Windows › "Run workflow" (sadece derle) yayınlamadan dener; exe işin "Artifacts" bölümünden indirilebilir. macOS uygulaması bu iş akışından etkilenmez.
+
+Xloer'in içindeki FastShot bu klasörden kopyalanır: Xloer'de `npm run sync-fastshot`.
+
 ## Yapı
 
 - `src/FastShot.Core`: çizim modeli, WPF çizim motoru, görüntü/video dışa aktarma, GIF ve PDF yazıcıları, dosya dönüştürme (`Convert/`), proje kütüphanesi ve Media Foundation (MP4 okuma/yazma, ses) katmanı. Pencere açmaz; testlerle sınanır.

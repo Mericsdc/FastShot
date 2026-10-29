@@ -1,0 +1,100 @@
+# Builds FastShot for Windows (windows/) and publishes FastShot-Windows-x64.exe
+# as a GitHub release whenever a windows-v* tag is pushed:
+#
+#   git tag -a windows-v1.1.0 -m "Release notes, shown on the release page"
+#   git push origin windows-v1.1.0
+#
+# The tag's message becomes the release notes, and the version in the tag
+# goes into the exe. A tag whose release already exists gets its exe replaced.
+# "Run workflow" (build only) builds and starts the exe without publishing.
+# The macOS app is not touched.
+
+name: Windows
+
+on:
+  push:
+    tags: ['windows-v*']
+  workflow_dispatch:
+    inputs:
+      build_only:
+        description: Sadece derle, yayınlama (deneme)
+        type: boolean
+        default: true
+
+concurrency:
+  group: windows-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Version from the tag
+        id: version
+        run: |
+          $ref = '${{ github.ref_name }}'
+          $version = if ($ref -match '^windows-v(\d+\.\d+\.\d+)$') { $Matches[1] } else { '0.0.0' }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "FastShot for Windows $version" >> $env:GITHUB_STEP_SUMMARY
+
+      - name: Build FastShot-Windows-x64.exe
+        env:
+          DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+          DOTNET_NOLOGO: '1'
+        run: |
+          # Self-contained, so it runs on PCs without .NET installed.
+          dotnet publish windows/src/FastShot/FastShot.csproj -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true `
+            -p:DebugType=none -p:Version=${{ steps.version.outputs.version }} -o out
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Move-Item out/FastShot.exe out/FastShot-Windows-x64.exe
+          "exe: {0:N1} MB" -f ((Get-Item out/FastShot-Windows-x64.exe).Length / 1MB) >> $env:GITHUB_STEP_SUMMARY
+
+      - name: Check that it starts
+        run: |
+          # --embedded runs it without a tray icon; it reports its state on stdout and quits when stdin closes.
+          $start = New-Object System.Diagnostics.ProcessStartInfo (Resolve-Path out/FastShot-Windows-x64.exe)
+          $start.Arguments = "--embedded $PID"
+          $start.UseShellExecute = $false
+          $start.RedirectStandardInput = $true
+          $start.RedirectStandardOutput = $true
+          $process = [System.Diagnostics.Process]::Start($start)
+          $line = $process.StandardOutput.ReadLineAsync()
+          if (-not $line.Wait(60000) -or $line.Result -notmatch '"type":"state"') { throw "FastShot did not start: $($line.Result)" }
+          $process.StandardInput.Close()
+          if (-not $process.WaitForExit(30000)) { $process.Kill(); throw 'FastShot did not quit' }
+          "Started and quit: $($line.Result)" >> $env:GITHUB_STEP_SUMMARY
+
+      - name: Publish ${{ github.ref_name }}
+        if: startsWith(github.ref, 'refs/tags/windows-v') && !inputs.build_only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = '${{ github.ref_name }}'
+          gh release view $tag > $null 2>&1
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag out/FastShot-Windows-x64.exe --clobber
+          } else {
+            gh release create $tag out/FastShot-Windows-x64.exe --title "FastShot for Windows ${{ steps.version.outputs.version }}" --notes-from-tag --verify-tag
+          }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Keep the exe of a build-only run
+        if: ${{ !startsWith(github.ref, 'refs/tags/windows-v') || inputs.build_only }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: FastShot-Windows-x64
+          path: out/FastShot-Windows-x64.exe
+          retention-days: 7
