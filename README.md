@@ -13,24 +13,36 @@ Kısayolları değiştirmek için FastShot'ı Uygulamalar'dan (veya Spotlight'ta
 
 **Mac'in kendi ekran görüntüsü tuşlarını kullanmak:** Ayarlar › Kısayollar › "Mac'in ekran görüntüsü tuşları" bölümündeki **FastShot'a ver** düğmesi; macOS'ta "Seçili alanın resmi" (panoya/dosyaya) ve "Ekran görüntüsü ve kayıt seçenekleri" kısayollarını kapatır ve aynı tuşları FastShot'a atar (ör. ⇧⌘4 → FastShot ekran görüntüsü, ⇧⌘5 → FastShot video). Tam ekran kısayolları macOS'ta kalır. **macOS'a geri ver** eski ayarı aynen geri yükler.
 
-### Tek tıkla dosya dönüştürme
+### Dosya çarkı: dönüştür, araçlar, işlemler
 
-Dönüştürme çarkını açmanın yolları:
+Finder'da veya masaüstünde dosyaları sürüklerken bir tuşa bir kez basın; imlecin etrafında o çark açılır, seçeneğin üzerine bırakın. Çark açıkken başka bir tuşa basarak (ya da üstteki çubuğun üzerinde bekleyerek) çarklar arasında geçebilirsiniz.
 
-- **Seç + kısayol:** Finder'da dosyaları seçin, **⌃⇧D**'ye basın, çarkta biçime tıklayın. (İlk kullanımda macOS, FastShot'ın Finder seçimini okumasına izin ister.)
-- **Sürükle + Shift:** dosyaları sürüklemeye başlayın, **⇧ Shift**'e bir kez basın, çarkta biçimin üzerine bırakın. Touchpad'de rahat sürüklemek için Sistem Ayarları › Erişilebilirlik › İşaretleyici Denetimi › İzleme Dörtgeni Seçenekleri › "Sürükleme stili: Üç parmakla sürükle".
-- **Sağ tık:** dosyalara sağ tık (touchpad'de **iki parmakla tıklama** veya **Control + tıklama**) › Hizmetler › **FastShot ile dönüştür**.
+| Tuş | Çark | Seçenekler |
+| --- | --- | --- |
+| **⇧** | Dönüştür | Aşağıdaki biçimler |
+| **⌘** | Araçlar | Görüntü: Düzenle (FastShot düzenleyicisinde çiz, yaz, bulanıklaştır) · Kırp (oran seçenekleriyle) · Arka plan (paylaşıma hazır çerçeve) · Sıkıştır · Meta veri sil (konum vb.) · Metni kopyala (OCR) — Video: Düzenle · Sıkıştır · Sesi kaldır · Meta veri sil — Ses/PDF: Sıkıştır · Meta veri sil · PDF birleştir |
+| **⌃** | İşlemler | ZIP'le / ZIP'i aç · AirDrop · Panoya kopyala · Yolu kopyala · Ekrana sabitle · Terminal'de aç (her dosya ve klasör için) |
+
+Sürüklemeden kullanmak için:
+
+- **Seç + kısayol:** Finder'da dosyaları seçin, **⌃⇧D**'ye basın; çark tıklanabilir açılır (⇧ ⌘ ⌃ ile veya üstteki çubuktan çark değiştirilir). İlk kullanımda macOS, FastShot'ın Finder seçimini okumasına izin ister.
+- **Sağ tık:** dosyalara sağ tık (touchpad'de **iki parmakla tıklama** veya **Control + tıklama**) › Hizmetler › **FastShot çarkı**.
 - **Menü çubuğu:** FastShot › **Dosyaları dönüştür…**
+- Touchpad'de rahat sürüklemek için: Sistem Ayarları › Erişilebilirlik › İşaretleyici Denetimi › İzleme Dörtgeni Seçenekleri › "Üç parmakla sürükle".
+
+Orijinal dosyalar hiç değiştirilmez; sonuçlar `ad (küçük).jpg`, `ad (kırpılmış).png` gibi yeni dosyalar olarak kaynağın yanına (veya Ayarlar'da seçtiğiniz klasöre) kaydedilir.
+
+**Dönüştürme biçimleri**
 
 | Kaynak | Hedef biçimler |
 | --- | --- |
-| Görüntü (PNG, JPEG, HEIC, WebP, TIFF, AVIF, GIF, BMP, PSD…) | PNG, JPEG, HEIC, PDF (birden çok görüntü tek PDF olur), TIFF, AVIF, GIF, BMP |
-| Video (MOV, MP4, M4V…) | MP4, MOV, HEVC, GIF, M4A ve WAV (ses çıkarma) |
-| Ses (MP3, M4A, WAV, AIFF, FLAC, CAF…) | M4A, WAV, AIFF, FLAC, CAF |
+| Görüntü (PNG, JPEG, HEIC, WebP, TIFF, AVIF, GIF, BMP, PSD…) | PNG, JPEG, HEIC, WebP, PDF (birden çok görüntü tek PDF olur), TIFF, AVIF, GIF, BMP |
+| Video (MOV, MP4, M4V…) | MP4, MOV, HEVC, GIF, M4A / WAV / MP3 (ses çıkarma) |
+| Ses (MP3, M4A, WAV, AIFF, FLAC, CAF…) | M4A, MP3, WAV, AIFF, FLAC, CAF |
 | PDF | Sayfa görüntüleri (PNG, JPEG, HEIC, TIFF), TXT, RTF, DOCX |
 | Belge (DOCX, DOC, ODT, RTF, TXT, HTML, Markdown) | PDF, DOCX, RTF, TXT, HTML, ODT, DOC |
 
-Her şey macOS'un kendi motorlarıyla yapılır. WebP ve MP3 çıktısı macOS'ta yerleşik olmadığından, `brew install webp lame` (veya `ffmpeg`) kuruluysa çarka otomatik eklenir. Çarkı açan tuş, çıktı klasörü (kaynağın yanı / İndirilenler / seçilen klasör) Ayarlar › Dönüştürme'den değiştirilir.
+Her şey macOS'un kendi motorlarıyla yapılır. WebP ve MP3 çıktısı için `brew install webp lame` (veya `ffmpeg`) gerekir; kuruluysa çarka otomatik eklenir. Çark tuşları ve çıktı klasörü Ayarlar › Dosya çarkı'ndan değiştirilir.
 
 ### Seçim ekranında
 

@@ -27,7 +27,7 @@ struct SettingsView: View {
             shortcuts.tabItem { Label("Kısayollar", systemImage: "keyboard") }.tag(SettingsTab.shortcuts)
             saving.tabItem { Label("Kaydetme", systemImage: "square.and.arrow.down") }.tag(SettingsTab.saving)
             video.tabItem { Label("Video", systemImage: "video") }.tag(SettingsTab.video)
-            convert.tabItem { Label("Dönüştürme", systemImage: "arrow.triangle.2.circlepath") }.tag(SettingsTab.convert)
+            convert.tabItem { Label("Dosya çarkı", systemImage: "arrow.triangle.2.circlepath") }.tag(SettingsTab.convert)
         }
         .padding(18)
         .frame(width: 600, height: 640)
@@ -121,23 +121,28 @@ struct SettingsView: View {
     private var convert: some View {
         Form {
             Section {
-                Toggle("Dosya sürüklerken dönüştürme çarkını aç", isOn: $prefs.convertEnabled)
-                Picker("Çarkı açan tuş", selection: $prefs.convertModifier) {
-                    ForEach(ConvertModifier.allCases) { Text($0.title).tag($0) }
+                Toggle("Dosya sürüklerken çarkı aç", isOn: $prefs.convertEnabled)
+                ForEach(WheelMode.allCases) { mode in
+                    Picker("\(mode.title) çarkı", selection: modifierBinding(for: mode)) {
+                        ForEach(ConvertModifier.allCases) { Text($0.title).tag($0) }
+                    }
+                    .disabled(!prefs.convertEnabled)
                 }
-                .disabled(!prefs.convertEnabled)
             } footer: {
-                Text("Üç yol var: Finder'da dosyaları seçip \(prefs.convertHotkey?.displayString ?? "kısayola") basın · dosyaları sürüklerken \(prefs.convertModifier.title) tuşuna bir kez basıp çarkta bir biçimin üzerine bırakın · ya da sağ tık (izleme dörtgeninde iki parmakla tıklama veya Control + tıklama) › Hizmetler › FastShot ile dönüştür.")
+                Text("Dosyaları sürüklerken bir tuşa bir kez basın; imlecin etrafında o çark açılır, seçeneğin üzerine bırakın. Çark açıkken başka bir tuşa basarak ya da üstteki çubuğun üzerinde bekleyerek çarklar arasında geçebilirsiniz. Sürüklemeden kullanmak için Finder'da dosyaları seçip \(prefs.convertHotkey?.displayString ?? "kısayola") basın ya da sağ tık (izleme dörtgeninde iki parmakla tıklama veya Control + tıklama) › Hizmetler › FastShot çarkı.")
                     .font(.system(size: 11)).foregroundStyle(.secondary)
             }
             Section {
-                Picker("Dönüştürülen dosyalar", selection: $prefs.convertDestination) {
+                Picker("Oluşan dosyalar", selection: $prefs.convertDestination) {
                     ForEach(ConvertDestination.allCases) { Text($0.title).tag($0) }
                 }
                 if prefs.convertDestination == .custom { FolderRow(title: "Klasör", path: $prefs.convertFolder) }
                 Toggle("Bitince Finder'da göster", isOn: $prefs.revealAfterConvert)
+            } footer: {
+                Text("Orijinal dosyalar hiçbir zaman değiştirilmez; sonuçlar yeni dosya olarak kaydedilir.")
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
             }
-            Section("Desteklenen dönüşümler") {
+            Section("\(prefs.convertModifier.glyph) Dönüştür") {
                 ForEach([FileFamily.image, .video, .audio, .pdf, .document], id: \.self) { family in
                     LabeledContent(family.title) {
                         Text(FileConverter.targets(for: family).map(\.title).joined(separator: " · "))
@@ -149,8 +154,36 @@ struct SettingsView: View {
                         .font(.system(size: 11)).foregroundStyle(.secondary)
                 }
             }
+            Section("\(prefs.toolsModifier.glyph) Araçlar") {
+                LabeledContent("Görüntü") { listText("Düzenle (çiz, yaz, bulanıklaştır) · Kırp · Arka plan · Sıkıştır · Meta veri sil · Metni kopyala") }
+                LabeledContent("Video") { listText("Düzenle (çiz, kırp-süre) · Sıkıştır · Sesi kaldır · Meta veri sil") }
+                LabeledContent("Ses · PDF") { listText("Sıkıştır · Meta veri sil · PDF birleştir (birden çok PDF)") }
+            }
+            Section("\(prefs.actionsModifier.glyph) İşlemler") {
+                LabeledContent("Her dosya ve klasör") { listText("ZIP'le / ZIP'i aç · AirDrop · Panoya kopyala · Yolu kopyala · Ekrana sabitle (görüntü) · Terminal'de aç") }
+            }
         }
         .formStyle(.grouped)
+    }
+
+    private func listText(_ text: String) -> some View {
+        Text(text).font(.system(size: 11)).foregroundStyle(.secondary).multilineTextAlignment(.trailing)
+    }
+
+    /// Each wheel needs its own key; picking one that's taken swaps the two.
+    private func modifierBinding(for mode: WheelMode) -> Binding<ConvertModifier> {
+        Binding(get: { mode.modifier }, set: { newValue in
+            let old = mode.modifier
+            guard newValue != old else { return }
+            if prefs.convertModifier == newValue { prefs.convertModifier = old }
+            if prefs.toolsModifier == newValue { prefs.toolsModifier = old }
+            if prefs.actionsModifier == newValue { prefs.actionsModifier = old }
+            switch mode {
+            case .convert: prefs.convertModifier = newValue
+            case .tools: prefs.toolsModifier = newValue
+            case .actions: prefs.actionsModifier = newValue
+            }
+        })
     }
 
     private var takeoverSummary: String {

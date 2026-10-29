@@ -2,46 +2,183 @@ import AppKit
 import FastShotCore
 import SwiftUI
 
-/// Runs conversions one batch at a time, shows progress for slow ones and
-/// reports the results.
+/// Runs what the wheels start: conversions, tools and actions. Slow work is
+/// queued one batch at a time with a progress panel; results are announced
+/// with a notice that can reveal them in Finder.
 @MainActor
 final class ConversionCenter {
     static let shared = ConversionCenter()
 
-    private var queue: [(urls: [URL], format: ConversionFormat)] = []
+    private struct Job {
+        /// Shown while working, e.g. "JPEG biçimine dönüştürülüyor".
+        let title: String
+        /// Completes "… dosya ___", e.g. "JPEG olarak kaydedildi".
+        let done: String
+        let urls: [URL]
+        /// All files form one batch (merging, archiving several items).
+        let together: Bool
+        let work: ([URL], URL, @escaping @Sendable (Double) -> Void) async throws -> [URL]
+    }
+
+    private var queue: [Job] = []
     private var current: Task<Void, Never>?
+
+    func perform(_ item: WheelItem, on urls: [URL]) {
+        switch item.kind {
+        case .convert(let format): convert(urls, to: format)
+        case .tool(let tool): run(tool, on: urls)
+        case .action(let action): run(action, on: urls)
+        }
+    }
 
     func convert(_ urls: [URL], to format: ConversionFormat) {
         let files = urls.filter { FileConverter.family(of: $0) != nil }
         guard !files.isEmpty else { return }
-        queue.append((files, format))
-        runNext()
+        let quality = Preferences.shared.jpegQuality
+        let merges: Bool = { if case .imagesToPDF = format.kind { return files.count > 1 }; return false }()
+        enqueue(Job(title: "\(format.title) biçimine dönüştürülüyor", done: "\(format.title) olarak kaydedildi", urls: files, together: merges) { batch, folder, progress in
+            try await FileConverter.convert(batch, to: format, folder: { _ in folder }, quality: quality, progress: progress)
+        })
     }
+
+    // MARK: Tools
+
+    private func run(_ tool: FileTool, on urls: [URL]) {
+        switch tool {
+        case .edit:
+            AppController.shared.openInEditor(urls)
+        case .crop:
+            if let url = urls.first { CropWindowController.show(url) }
+        case .recognizeText:
+            guard let url = urls.first, let image = ImageExporter.load(url) else { return }
+            Task {
+                do {
+                    let text = try await TextRecognizer.recognize(image)
+                    if text.isEmpty {
+                        Toast.show("Metin bulunamadı", symbol: "text.viewfinder")
+                    } else {
+                        Output.copy(text: text)
+                        Toast.show("Metin panoya kopyalandı", symbol: "text.viewfinder", detail: "\(text.split(separator: "\n").count) satır")
+                    }
+                } catch {
+                    Output.showError(error, title: "Metin tanınamadı")
+                }
+            }
+        case .compress:
+            enqueue(Job(title: "Sıkıştırılıyor", done: tool.doneText, urls: urls, together: false) { batch, folder, progress in
+                [try await FileTools.compress(batch[0], folder: folder, progress: progress)]
+            })
+        case .metadata:
+            enqueue(Job(title: "Meta veriler temizleniyor", done: tool.doneText, urls: urls, together: false) { batch, folder, _ in
+                [try await FileTools.stripMetadata(batch[0], folder: folder)]
+            })
+        case .background:
+            enqueue(Job(title: "Arka plan ekleniyor", done: tool.doneText, urls: urls, together: false) { batch, folder, _ in
+                [try FileTools.addBackground(batch[0], folder: folder)]
+            })
+        case .removeAudio:
+            enqueue(Job(title: "Ses kaldırılıyor", done: tool.doneText, urls: urls, together: false) { batch, folder, progress in
+                [try await FileTools.removeAudio(batch[0], folder: folder, progress: progress)]
+            })
+        case .mergePDF:
+            enqueue(Job(title: "PDF'ler birleştiriliyor", done: tool.doneText, urls: urls, together: true) { batch, folder, _ in
+                [try FileTools.mergePDFs(batch, folder: folder)]
+            })
+        }
+    }
+
+    // MARK: Actions
+
+    private func run(_ action: FileAction, on urls: [URL]) {
+        switch action {
+        case .zip:
+            enqueue(Job(title: "ZIP arşivi oluşturuluyor", done: "ZIP olarak arşivlendi", urls: urls, together: true) { batch, folder, _ in
+                [try await FileTools.zip(batch, folder: folder)]
+            })
+        case .unzip:
+            enqueue(Job(title: "Arşiv açılıyor", done: "arşivden çıkarıldı", urls: urls, together: false) { batch, folder, _ in
+                [try await FileTools.unzip(batch[0], folder: folder)]
+            })
+        case .airDrop:
+            guard let service = NSSharingService(named: .sendViaAirDrop), service.canPerform(withItems: urls) else {
+                Toast.show("AirDrop kullanılamıyor", symbol: "exclamationmark.triangle.fill", detail: "Wi-Fi ve Bluetooth'un açık olduğundan emin olun")
+                return
+            }
+            NSApp.activate(ignoringOtherApps: true)
+            service.perform(withItems: urls)
+        case .copyToClipboard:
+            if urls.count == 1, FileConverter.family(of: urls[0]) == .image, let image = ImageExporter.load(urls[0]) {
+                Output.copy(image: image, pointScale: ImageExporter.pointScale(of: urls[0]) ?? 1)
+                Toast.show("Görüntü panoya kopyalandı", symbol: "doc.on.clipboard.fill", detail: "Mesaja veya belgeye yapıştırabilirsiniz")
+            } else {
+                Output.copy(fileURLs: urls)
+                Toast.show(urls.count == 1 ? "Dosya panoya kopyalandı" : "\(urls.count) öğe panoya kopyalandı", symbol: "doc.on.clipboard.fill",
+                           detail: "Finder'da ⌘V ile yapıştırın")
+            }
+        case .copyPath:
+            Output.copy(text: urls.map(\.path).joined(separator: "\n"))
+            Toast.show(urls.count == 1 ? "Yol kopyalandı" : "\(urls.count) yol kopyalandı", symbol: "link", detail: urls[0].path)
+        case .pin:
+            pin(urls)
+        case .terminal:
+            openTerminal(at: urls[0])
+        }
+    }
+
+    private func pin(_ urls: [URL]) {
+        let mouse = NSEvent.mouseLocation
+        let screen = (NSScreen.screens.first { $0.frame.contains(mouse) } ?? NSScreen.main)?.visibleFrame ?? .zero
+        for (index, url) in urls.enumerated() {
+            guard let image = ImageExporter.load(url) else { continue }
+            let scale = ImageExporter.pointScale(of: url) ?? 1
+            var size = CGSize(width: CGFloat(image.width) / scale, height: CGFloat(image.height) / scale)
+            let fit = min(1, screen.width * 0.45 / size.width, screen.height * 0.45 / size.height)
+            size = CGSize(width: size.width * fit, height: size.height * fit)
+            let offset = CGFloat(index) * 28
+            var origin = CGPoint(x: mouse.x - size.width / 2 + offset, y: mouse.y - size.height / 2 - offset)
+            origin.x = min(max(screen.minX, origin.x), screen.maxX - size.width)
+            origin.y = min(max(screen.minY, origin.y), screen.maxY - size.height)
+            PinWindow.show(image, pointScale: Double(scale / fit), frame: CGRect(origin: origin, size: size))
+        }
+    }
+
+    private func openTerminal(at url: URL) {
+        var isDirectory: ObjCBool = false
+        FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
+        let folder = isDirectory.boolValue ? url : url.deletingLastPathComponent()
+        guard let terminal = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal") else { return }
+        NSWorkspace.shared.open([folder], withApplicationAt: terminal, configuration: NSWorkspace.OpenConfiguration())
+    }
+
+    // MARK: Queue
 
     func cancel() {
         queue.removeAll()
         current?.cancel()
     }
 
+    private func enqueue(_ job: Job) {
+        guard !job.urls.isEmpty else { return }
+        queue.append(job)
+        runNext()
+    }
+
     private func runNext() {
         guard current == nil, !queue.isEmpty else { return }
         let job = queue.removeFirst()
         current = Task { [weak self] in
-            await self?.run(job.urls, job.format)
+            await self?.run(job)
             self?.current = nil
             self?.runNext()
         }
     }
 
-    private func run(_ urls: [URL], _ format: ConversionFormat) async {
+    private func run(_ job: Job) async {
         let prefs = Preferences.shared
-        let folders = Dictionary(uniqueKeysWithValues: urls.map { ($0, destination(for: $0)) })
-        for folder in Set(folders.values) { try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) }
-        let title = "\(format.title) biçimine dönüştürülüyor"
         let progress = ProgressHUD.Model()
-        progress.title = title
-        progress.detail = urls.count == 1 ? urls[0].lastPathComponent : "\(urls.count) dosya"
-        // Quick conversions finish before the progress panel would even appear.
+        progress.title = job.title
+        progress.detail = job.urls.count == 1 ? job.urls[0].lastPathComponent : "\(job.urls.count) dosya"
+        // Quick work finishes before the progress panel would even appear.
         let reveal = Task {
             try? await Task.sleep(nanoseconds: 450_000_000)
             if !Task.isCancelled { ProgressHUD.show(progress) { ConversionCenter.shared.cancel() } }
@@ -53,15 +190,15 @@ final class ConversionCenter {
 
         var outputs: [URL] = []
         var failures: [String] = []
-        let merges: Bool = { if case .imagesToPDF = format.kind { return urls.count > 1 }; return false }()
-        let batches: [[URL]] = merges ? [urls] : urls.map { [$0] }
+        let batches: [[URL]] = job.together ? [job.urls] : job.urls.map { [$0] }
         for (index, batch) in batches.enumerated() {
             if Task.isCancelled { break }
             if batches.count > 1 { progress.detail = "\(index + 1)/\(batches.count) · \(batch[0].lastPathComponent)" }
+            let folder = destination(for: batch[0])
+            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             let share = 1 / Double(batches.count), base = Double(index) * share
             do {
-                outputs += try await FileConverter.convert(batch, to: format, folder: { folders[$0] ?? $0.deletingLastPathComponent() },
-                                                           quality: prefs.jpegQuality) { fraction in
+                outputs += try await job.work(batch, folder) { fraction in
                     Task { @MainActor in progress.value = base + fraction * share }
                 }
             } catch is CancellationError {
@@ -73,22 +210,22 @@ final class ConversionCenter {
 
         if !outputs.isEmpty {
             if prefs.revealAfterConvert { NSWorkspace.shared.activateFileViewerSelecting(outputs) }
-            let summary = outputs.count == 1 ? "\(format.title) olarak kaydedildi" : "\(outputs.count) dosya \(format.title) olarak kaydedildi"
-            Toast.show(summary, symbol: "arrow.triangle.2.circlepath", detail: outputs[0].lastPathComponent, actionTitle: "Göster") {
+            let summary = outputs.count == 1 ? job.done.prefix(1).uppercased() + job.done.dropFirst() : "\(outputs.count) dosya \(job.done)"
+            Toast.show(summary, symbol: "checkmark.circle.fill", detail: outputs[0].lastPathComponent, actionTitle: "Göster") {
                 NSWorkspace.shared.activateFileViewerSelecting(outputs)
             }
         }
         if !failures.isEmpty {
             let alert = NSAlert()
             alert.alertStyle = .warning
-            alert.messageText = failures.count == 1 ? "Bir dosya dönüştürülemedi" : "\(failures.count) dosya dönüştürülemedi"
+            alert.messageText = failures.count == 1 ? "Bir dosya işlenemedi" : "\(failures.count) dosya işlenemedi"
             alert.informativeText = failures.prefix(8).joined(separator: "\n")
             NSApp.activate(ignoringOtherApps: true)
             alert.runModal()
         }
     }
 
-    private func destination(for url: URL) -> URL {
+    func destination(for url: URL) -> URL {
         let prefs = Preferences.shared
         let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
         switch prefs.convertDestination {
@@ -130,9 +267,8 @@ final class ConversionCenter {
         } else if let path = result.stringValue {
             urls.append(URL(fileURLWithPath: path))
         }
-        urls = urls.filter { !$0.hasDirectoryPath }
         guard !urls.isEmpty else {
-            Toast.show("Finder'da dönüştürülecek dosyaları seçin", symbol: "cursorarrow.click.2")
+            Toast.show("Finder'da dosya seçin", symbol: "cursorarrow.click.2")
             return
         }
         ConversionWheel.shared.show(files: urls, at: NSEvent.mouseLocation, interactive: true)
@@ -142,8 +278,8 @@ final class ConversionCenter {
     func chooseFiles() {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true
-        panel.canChooseDirectories = false
-        panel.message = "Dönüştürülecek dosyaları seçin (aynı türden: görüntü, video, ses, PDF veya belge)"
+        panel.canChooseDirectories = true
+        panel.message = "Dosyaları seçin: dönüştürme, araçlar ve işlemler çarkı açılacak"
         panel.prompt = "Seç"
         NSApp.activate(ignoringOtherApps: true)
         guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }

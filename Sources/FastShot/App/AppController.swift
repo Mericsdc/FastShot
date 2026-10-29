@@ -40,7 +40,8 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         buildStatusItem()
         HotKeyCenter.shared.reregister = { [weak self] in self?.registerHotkeys() }
         registerHotkeys()
-        DragMonitor.shared.onTrigger = { urls, point in ConversionWheel.shared.show(files: urls, at: point, interactive: false) }
+        DragMonitor.shared.onTrigger = { urls, point, mode in ConversionWheel.shared.show(files: urls, at: point, interactive: false, mode: mode) }
+        DragMonitor.shared.onSwitch = { mode in ConversionWheel.shared.switchMode(mode) }
         DragMonitor.shared.onDragEnded = { ConversionWheel.shared.dragEnded() }
         DragMonitor.shared.start()
         NSApp.servicesProvider = self
@@ -274,7 +275,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc func chooseFilesToConvert() { ConversionCenter.shared.chooseFiles() }
 
-    /// Finder › Services › "FastShot ile dönüştür": opens the wheel for the selected files.
+    /// Finder › Services › "FastShot çarkı": opens the wheel for the selected files.
     @objc func convertFilesService(_ pasteboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
         let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
         guard !urls.isEmpty else { return }
@@ -295,6 +296,11 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NSApp.activate(ignoringOtherApps: true)
         guard panel.runModal() == .OK, let url = panel.url else { return }
         open(url)
+    }
+
+    /// Opens files in FastShot's own editors (drawing, text, blur, trimming).
+    func openInEditor(_ urls: [URL]) {
+        urls.prefix(10).forEach(open)
     }
 
     private func open(_ url: URL) {

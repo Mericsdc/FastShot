@@ -369,7 +369,8 @@ public enum FileConverter {
 
     // MARK: Audio
 
-    static func convertAudio(_ url: URL, to target: AudioTarget, output: URL, progress: @escaping @Sendable (Double) -> Void) async throws {
+    static func convertAudio(_ url: URL, to target: AudioTarget, output: URL, bitRate: Int? = nil,
+                             progress: @escaping @Sendable (Double) -> Void) async throws {
         if target == .mp3 {
             try await convertToMP3(url, output: output, progress: progress)
             return
@@ -393,7 +394,7 @@ public enum FileConverter {
         reader.add(readerOutput)
         guard let pcm = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, channels: AVAudioChannelCount(channels), interleaved: false),
               reader.startReading() else { throw ConversionError.unreadable(url.lastPathComponent) }
-        let file = try AVAudioFile(forWriting: output, settings: settings(for: target, sampleRate: sampleRate, channels: channels),
+        let file = try AVAudioFile(forWriting: output, settings: settings(for: target, sampleRate: sampleRate, channels: channels, bitRate: bitRate),
                                    commonFormat: .pcmFormatFloat32, interleaved: false)
         var seconds = 0.0
         while let sample = readerOutput.copyNextSampleBuffer() {
@@ -410,14 +411,14 @@ public enum FileConverter {
         if reader.status == .failed { throw reader.error ?? ConversionError.unreadable(url.lastPathComponent) }
     }
 
-    static func settings(for target: AudioTarget, sampleRate: Double, channels: Int) -> [String: Any] {
+    static func settings(for target: AudioTarget, sampleRate: Double, channels: Int, bitRate: Int? = nil) -> [String: Any] {
         let common: [String: Any] = [AVSampleRateKey: sampleRate, AVNumberOfChannelsKey: channels]
         func pcm(bigEndian: Bool) -> [String: Any] {
             common.merging([AVFormatIDKey: kAudioFormatLinearPCM, AVLinearPCMBitDepthKey: 16, AVLinearPCMIsFloatKey: false,
                             AVLinearPCMIsBigEndianKey: bigEndian, AVLinearPCMIsNonInterleaved: false]) { $1 }
         }
         switch target {
-        case .m4a: return common.merging([AVFormatIDKey: kAudioFormatMPEG4AAC, AVEncoderBitRateKey: channels > 1 ? 256_000 : 128_000]) { $1 }
+        case .m4a: return common.merging([AVFormatIDKey: kAudioFormatMPEG4AAC, AVEncoderBitRateKey: bitRate ?? (channels > 1 ? 256_000 : 128_000)]) { $1 }
         case .wav, .caf: return pcm(bigEndian: false)
         case .aiff: return pcm(bigEndian: true)
         case .flac: return common.merging([AVFormatIDKey: kAudioFormatFLAC]) { $1 }

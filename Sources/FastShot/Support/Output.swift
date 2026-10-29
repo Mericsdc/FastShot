@@ -44,10 +44,12 @@ enum Output {
         if let tiff = nsImage.tiffRepresentation { pasteboard.setData(tiff, forType: .tiff) }
     }
 
-    static func copy(fileURL: URL) {
+    static func copy(fileURL: URL) { copy(fileURLs: [fileURL]) }
+
+    static func copy(fileURLs: [URL]) {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        pasteboard.writeObjects([fileURL as NSURL])
+        pasteboard.writeObjects(fileURLs.map { $0 as NSURL })
     }
 
     static func copy(text: String) {

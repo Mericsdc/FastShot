@@ -72,6 +72,8 @@ final class Preferences: ObservableObject {
     @Published var openEditorAfterRecording: Bool { didSet { defaults.set(openEditorAfterRecording, forKey: "video.openEditor") } }
     @Published var convertEnabled: Bool { didSet { defaults.set(convertEnabled, forKey: "convert.enabled") } }
     @Published var convertModifier: ConvertModifier { didSet { defaults.set(convertModifier.rawValue, forKey: "convert.modifier") } }
+    @Published var toolsModifier: ConvertModifier { didSet { defaults.set(toolsModifier.rawValue, forKey: "convert.toolsModifier") } }
+    @Published var actionsModifier: ConvertModifier { didSet { defaults.set(actionsModifier.rawValue, forKey: "convert.actionsModifier") } }
     @Published var convertDestination: ConvertDestination { didSet { defaults.set(convertDestination.rawValue, forKey: "convert.destination") } }
     @Published var convertFolder: String { didSet { defaults.set(convertFolder, forKey: "convert.folder") } }
     @Published var revealAfterConvert: Bool { didSet { defaults.set(revealAfterConvert, forKey: "convert.reveal") } }
@@ -120,6 +122,8 @@ final class Preferences: ObservableObject {
         annotationLength = defaults.object(forKey: "video.annotationLength") as? Double ?? 3
         convertEnabled = defaults.object(forKey: "convert.enabled") as? Bool ?? true
         convertModifier = ConvertModifier(rawValue: defaults.string(forKey: "convert.modifier") ?? "") ?? .shift
+        toolsModifier = ConvertModifier(rawValue: defaults.string(forKey: "convert.toolsModifier") ?? "") ?? .command
+        actionsModifier = ConvertModifier(rawValue: defaults.string(forKey: "convert.actionsModifier") ?? "") ?? .control
         convertDestination = ConvertDestination(rawValue: defaults.string(forKey: "convert.destination") ?? "") ?? .beside
         convertFolder = defaults.string(forKey: "convert.folder") ?? home.appendingPathComponent("Downloads").path
         revealAfterConvert = defaults.object(forKey: "convert.reveal") as? Bool ?? false
