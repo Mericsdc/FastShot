@@ -76,6 +76,8 @@ public sealed class Preferences
         public bool PrintScreenTakenOver;
         public bool ShowTrayIcon = true;
         public bool CheckForUpdates = true;
+        public TranslateEngine TranslateEngine = TranslateEngine.Offline;
+        public string TranslateTarget = "tr";
         public double AnnotationLength = 3;
         public string LastColor = RGBAColor.Red.Hex;
         public int LastSize = 1;
@@ -146,6 +148,10 @@ public sealed class Preferences
     public bool ShowTrayIcon { get => data.ShowTrayIcon; set => Set(ref data.ShowTrayIcon, value); }
     /// <summary>The installed copy looks for new releases on GitHub (see Updater).</summary>
     public bool CheckForUpdates { get => data.CheckForUpdates; set => Set(ref data.CheckForUpdates, value); }
+    /// <summary>DeepL needs the user's own key (see DeepLKey); without one the offline engine is used.</summary>
+    public TranslateEngine TranslateEngine { get => data.TranslateEngine; set => Set(ref data.TranslateEngine, value); }
+    /// <summary>The language the translation window translates to; it remembers the last choice.</summary>
+    public string TranslateTarget { get => data.TranslateTarget; set => Set(ref data.TranslateTarget, value); }
     public bool ConvertEnabled { get => data.ConvertEnabled; set => Set(ref data.ConvertEnabled, value); }
     /// <summary>Opens the file wheel while files are dragged; tapping it again goes to the next wheel.</summary>
     public ConvertModifier WheelKey { get => data.WheelKey; set => Set(ref data.WheelKey, value); }

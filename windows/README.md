@@ -26,6 +26,13 @@ Kısayolları değiştirmek için bildirim alanındaki FastShot simgesine tıkla
 
 **Print Screen tuşu:** Windows 11'de Print Screen varsayılan olarak Ekran Alıntısı Aracı'nı açar ve FastShot'a ulaşmaz. Ayarlar › Kısayollar › "Windows'un Print Screen tuşu" bölümündeki **FastShot'a ver** düğmesi bu Windows seçeneğini kapatır; **Windows'a geri ver** eski hâline döndürür. Başka bir uygulama (ör. başka bir ekran görüntüsü aracı) tuşu tutuyorsa ayarlarda turuncu bir uyarı görünür.
 
+### Metni çevir
+
+Seçim ekranında **Metni tanı ve çevir** (Ctrl+Shift+T), dosya çarkında Araçlar › **Çevir** ya da bildirim alanı menüsünde **Çeviri…**. Seçilen alandaki metin tanınır, ekrandaki satırlar paragraflara birleştirilir (bölünmüş kelimeler de) ve çeviri penceresinde yan yana gösterilir; iki taraf da kopyalanabilir, metin düzenlendikçe çeviri yenilenir.
+
+- **Çevrimdışı (varsayılan):** Firefox'un çeviri motoru ve modelleri bu bilgisayarda çalışır; anahtar, hesap ve internet (ilk indirmeden sonra) gerekmez, metin bilgisayardan çıkmaz. Bir dil yönünün modeli (yaklaşık 20 MB) ilk çeviride bir kez indirilir. Türkçe, İngilizce, Almanca, Fransızca, İspanyolca, İtalyanca ve 24 dil daha; İngilizce dışındaki çiftler İngilizce üzerinden çevrilir. Microsoft Edge WebView2 gerekir (Windows 11'de ve güncel Windows 10'da yüklüdür).
+- **DeepL (isteğe bağlı):** Ayarlar › Çeviri'ye kendi DeepL API anahtarınızı girin (ücretsiz plan: ayda 500.000 karakter). Anahtar yalnızca bu bilgisayarda, Windows Kimlik Bilgileri Yöneticisi'nde şifreli saklanır.
+
 ### Dosya çarkı: dönüştür, araçlar, işlemler
 
 Gezgin'de veya masaüstünde dosyaları (ya da klasörleri) sürüklerken **AltGr**'ye bir kez basın; imlecin etrafında **Dönüştür** çarkı açılır. AltGr'ye tekrar bastıkça **Araçlar** ve **İşlemler** çarklarına geçilir; halkanın üstündeki çubukta bir an beklemek de o çarkı açar. Seçeneğin üzerine bırakın.

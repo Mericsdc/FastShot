@@ -27,7 +27,7 @@ public sealed class FileToolsTests : IDisposable
     public void WhichToolsAndActionsApply()
     {
         string jpg = Path.Combine(folder, "a.jpg"), pdf1 = Path.Combine(folder, "a.pdf"), pdf2 = Path.Combine(folder, "b.pdf");
-        Assert.Equal([FileTool.Edit, FileTool.Crop, FileTool.Background, FileTool.Compress, FileTool.Metadata, FileTool.RecognizeText], FileTools.Tools([jpg]));
+        Assert.Equal([FileTool.Edit, FileTool.Crop, FileTool.Background, FileTool.Compress, FileTool.Metadata, FileTool.RecognizeText, FileTool.Translate], FileTools.Tools([jpg]));
         Assert.Contains(FileTool.MergePdf, FileTools.Tools([pdf1, pdf2]));
         Assert.DoesNotContain(FileTool.MergePdf, FileTools.Tools([pdf1]));
         Assert.Empty(FileTools.Tools([jpg, pdf1]));
