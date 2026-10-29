@@ -50,6 +50,9 @@ public sealed class TranslateTests
         Assert.Equal("tr", Languages.Guess("Kayıt durdu, dosya kaydedilemedi."));
         Assert.Equal("tr", Languages.Guess("Bu bir deneme ve çok kısa"));
         Assert.Equal("en", Languages.Guess("The recording stopped because the disk is full."));
+        // Windows' Turkish text recognition put a dotless i into an English word.
+        Assert.Equal("en", Languages.Guess("The screen looks like it should. Let me check the saved state on my sideı without reading the key itself:"));
+        Assert.Equal("tr", Languages.Guess("Kayıt durdu"));
         Assert.Equal("de", Languages.Guess("Die Aufnahme wurde nicht gespeichert, und das ist ein Fehler."));
         Assert.Equal("el", Languages.Guess("Καλημέρα κόσμε"));
         Assert.Null(Languages.Guess("12345 !!"));

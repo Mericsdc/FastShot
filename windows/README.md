@@ -28,7 +28,7 @@ Kısayolları değiştirmek için bildirim alanındaki FastShot simgesine tıkla
 
 ### Metni çevir
 
-Seçim ekranında **Metni tanı ve çevir** (Ctrl+Shift+T), dosya çarkında Araçlar › **Çevir** ya da bildirim alanı menüsünde **Çeviri…**. Seçilen alandaki metin tanınır, ekrandaki satırlar paragraflara birleştirilir (bölünmüş kelimeler de) ve çeviri penceresinde yan yana gösterilir; iki taraf da kopyalanabilir, metin düzenlendikçe çeviri yenilenir.
+Seçim ekranında **Metni tanı ve çevir** (Ctrl+Shift+T), dosya çarkında Araçlar › **Çevir** ya da bildirim alanı menüsünde **Çeviri…**. Seçilen alandaki metin tanınır, ekrandaki satırlar paragraflara birleştirilir (bölünmüş kelimeler de) ve imlecin yanında açılan bir çeviri kartında gösterilir: üstte dil seçicileri ve kullanılan motor, ortada çeviri, altında düzenlenebilir orijinal metin (düzenledikçe çeviri yenilenir), altta Kopyala ve Orijinali kopyala. Kart başlığından sürüklenir, Esc ile kapanır. Metin zaten hedef dildeyse hedef kendiliğinden değişir (Türkçe → İngilizce, diğerleri → Türkçe).
 
 - **Çevrimdışı (varsayılan):** Firefox'un çeviri motoru ve modelleri bu bilgisayarda çalışır; anahtar, hesap ve internet (ilk indirmeden sonra) gerekmez, metin bilgisayardan çıkmaz. Bir dil yönünün modeli (yaklaşık 20 MB) ilk çeviride bir kez indirilir. Türkçe, İngilizce, Almanca, Fransızca, İspanyolca, İtalyanca ve 24 dil daha; İngilizce dışındaki çiftler İngilizce üzerinden çevrilir. Microsoft Edge WebView2 gerekir (Windows 11'de ve güncel Windows 10'da yüklüdür).
 - **DeepL (isteğe bağlı):** Ayarlar › Çeviri'ye kendi DeepL API anahtarınızı girin (ücretsiz plan: ayda 500.000 karakter). Anahtar yalnızca bu bilgisayarda, Windows Kimlik Bilgileri Yöneticisi'nde şifreli saklanır.
