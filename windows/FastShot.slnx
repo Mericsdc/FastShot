@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/FastShot.Core/FastShot.Core.csproj" />
+    <Project Path="src/FastShot/FastShot.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/FastShot.Core.Tests/FastShot.Core.Tests.csproj" />
+  </Folder>
+</Solution>
