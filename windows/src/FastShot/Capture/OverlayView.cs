@@ -502,8 +502,7 @@ public sealed class OverlayView : Canvas
                 return true;
             case Key.Enter:
                 if (IsChoosing) SelectWholeScreen();
-                else if (IsVideo) session.Record();
-                else session.Copy();
+                else session.PerformDefaultAction();
                 return true;
         }
         if (IsChoosing) return false;
@@ -522,6 +521,8 @@ public sealed class OverlayView : Canvas
                 case Key.P: if (!IsVideo) session.Pin(); return true;
                 case Key.T: if (!IsVideo) session.RecognizeText(); return true;
                 case Key.R: session.Record(); return true;
+                case Key.Q: if (!IsVideo) session.Enqueue(); return true;
+                case Key.J: if (!IsVideo) session.Scroll(); return true;
             }
         }
         if (modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && key == Key.S && !IsVideo)

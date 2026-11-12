@@ -21,6 +21,32 @@ public sealed class OverlayTests
     [Fact]
     public void ToolbarContentGrowthIsRepositionedAfterInitialLayout() => VerifyLayout(1920, 1080, 1.5, grow: true);
 
+    [Theory]
+    [InlineData(300)]
+    [InlineData(600)]
+    public void RecordingControlsIncludingPauseAndDrawingFitNarrowScreens(int availableWidth) => Sta.Run(() =>
+    {
+        var folder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        try
+        {
+            var monitor = new FastShot.MonitorInfo(IntPtr.Zero, new(0, 0, 640, 480), new(0, 0, 640, 440), 2, true);
+            var session = new FastShot.RecordingSession(new(monitor, new Rect(0, 0, 320, 240), 2), new ProjectLibrary(folder));
+            var hud = new FastShot.RecordingHud(session);
+            hud.SetRecording(true); hud.SetDrawing(true);
+            hud.Root.Measure(new Size(availableWidth, 80));
+            hud.Root.Arrange(new Rect(new Point(), hud.Root.DesiredSize));
+            hud.Root.UpdateLayout();
+            var bounds = new Rect(new Point(), hud.Root.RenderSize);
+            Assert.True(bounds.Width <= availableWidth && bounds.Height <= 80);
+            foreach (var button in Descendants(hud.Root).OfType<FrameworkElement>().Where(b => b is FastShot.IconButton or FastShot.PillButton or System.Windows.Controls.Button))
+            {
+                var rect = button.TransformToAncestor(hud.Root).TransformBounds(new Rect(button.RenderSize));
+                Assert.True(rect.Width > 0 && bounds.Contains(rect), $"{button.ToolTip}: {rect} outside {bounds}");
+            }
+        }
+        finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
+    });
+
     static void VerifyLayout(int width, int height, double scale, bool grow = false) => Sta.Run(() =>
     {
         var monitor = new FastShot.MonitorInfo(IntPtr.Zero, new(0, 0, width, height), new(0, 0, width, height), scale, true);

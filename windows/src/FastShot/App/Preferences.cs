@@ -68,6 +68,7 @@ public sealed class Preferences
         public bool PlaySounds = true;
         public int FramesPerSecond = 30;
         public bool ShowCursor = true;
+        public bool HighlightClicks;
         public VideoCodec VideoCodec = VideoCodec.h264;
         public int Countdown;
         public bool OpenEditorAfterRecording = true;
@@ -137,6 +138,7 @@ public sealed class Preferences
     public bool PlaySounds { get => data.PlaySounds; set => Set(ref data.PlaySounds, value); }
     public int FramesPerSecond { get => data.FramesPerSecond; set => Set(ref data.FramesPerSecond, value); }
     public bool ShowCursor { get => data.ShowCursor; set => Set(ref data.ShowCursor, value); }
+    public bool HighlightClicks { get => data.HighlightClicks; set => Set(ref data.HighlightClicks, value); }
     public VideoCodec VideoCodec { get => data.VideoCodec; set => Set(ref data.VideoCodec, value); }
     public int Countdown { get => data.Countdown; set => Set(ref data.Countdown, value); }
     public bool OpenEditorAfterRecording { get => data.OpenEditorAfterRecording; set => Set(ref data.OpenEditorAfterRecording, value); }

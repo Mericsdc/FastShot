@@ -473,6 +473,8 @@ public sealed class SettingsWindow : Window
         page.Children.Add(Row("Kodek", Picker([(VideoCodec.h264.Title(), VideoCodec.h264), (VideoCodec.hevc.Title(), VideoCodec.hevc)], () => prefs.VideoCodec, v => prefs.VideoCodec = v)));
         page.Children.Add(Row("Geri sayım", Picker([("Yok", 0), ("3 saniye", 3), ("5 saniye", 5)], () => prefs.Countdown, v => prefs.Countdown = v)));
         page.Children.Add(Toggle("İmleci göster", () => prefs.ShowCursor, on => prefs.ShowCursor = on));
+        page.Children.Add(Toggle("Videoda fare tıklamalarını vurgula", () => prefs.HighlightClicks, on => prefs.HighlightClicks = on));
+        page.Children.Add(Note("Kayıt çubuğundaki Duraklat / Devam et düğmesi ses ve görüntüye birlikte ara verir. Tıklama halkaları videoda düzenlenebilir çizimler olarak saklanır."));
         page.Children.Add(Toggle("Sistem sesini kaydet", () => prefs.RecordSystemAudio, on => prefs.RecordSystemAudio = on));
         page.Children.Add(Toggle("Mikrofonu kaydet", () => prefs.RecordMicrophone, on => prefs.RecordMicrophone = on));
         page.Children.Add(Toggle("Kayıttan sonra düzenleyiciyi aç", () => prefs.OpenEditorAfterRecording, on => prefs.OpenEditorAfterRecording = on));

@@ -27,6 +27,8 @@ public sealed class AppController
     RecordingSession? recording;
     SettingsWindow? settings;
     LibraryWindow? libraryWindow;
+    CaptureQueueWindow? captureQueue;
+    ScrollingCaptureSession? scrolling;
     bool startingCapture;
     bool quitting;
     readonly ShutdownCoordinator shutdown;
@@ -181,6 +183,40 @@ public sealed class AppController
 
     public void TakeScreenshot() => StartCapture(CaptureSession.CaptureMode.Screenshot);
 
+    public void ShowCaptureQueue()
+    {
+        if (captureQueue is null)
+        {
+            captureQueue = new CaptureQueueWindow(() => StartCapture(CaptureSession.CaptureMode.Queue));
+            captureQueue.Closed += (_, _) => captureQueue = null;
+        }
+        captureQueue.ReturnToQueue();
+    }
+
+    void EnqueueCapture(BitmapSource image)
+    {
+        ShowCaptureQueue();
+        captureQueue!.Add(image);
+    }
+
+    void StartScrolling(RecordRequest request)
+    {
+        if (scrolling is not null || quitting) return;
+        var session = new ScrollingCaptureSession(request, (image, scale) =>
+        {
+            try
+            {
+                var stored = Library.MakeProject(CaptureKind.image, new Size(image.PixelWidth / scale, image.PixelHeight / scale), scale, "png");
+                File.WriteAllBytes(Library.MediaPath(stored), ImageExporter.Encode(image, ImageFormat.Png, pointScale: scale));
+                Library.Save(stored); Library.WriteThumbnail(image, stored); NotifyLibraryChanged(); OpenEditor(stored);
+            }
+            catch (Exception error) { Output.ShowError(error, "Kaydırmalı görüntü kaydedilemedi"); }
+        });
+        scrolling = session;
+        session.Finished += () => { if (scrolling == session) scrolling = null; };
+        session.Show();
+    }
+
     public void RecordVideo()
     {
         if (recording is not null)
@@ -193,21 +229,24 @@ public sealed class AppController
 
     void StartCapture(CaptureSession.CaptureMode mode)
     {
-        if (quitting || capture is not null || startingCapture) return;
+        if (quitting || capture is not null || scrolling is not null || startingCapture) { if (mode == CaptureSession.CaptureMode.Queue) captureQueue?.ReturnToQueue(); return; }
         if (mode == CaptureSession.CaptureMode.Video && recording is not null) return;
         startingCapture = true;
         try
         {
             var rects = ScreenGrabber.WindowRects();
             var shots = ScreenGrabber.CaptureAll();
-            if (shots.Count == 0) return;
+            if (shots.Count == 0) { if (mode == CaptureSession.CaptureMode.Queue) captureQueue?.ReturnToQueue(); return; }
             var session = new CaptureSession(mode, shots, rects);
             session.OnFinish = finished =>
             {
                 if (capture == finished) capture = null;
                 HotKeyCenter.Shared.Resume();
+                if (mode == CaptureSession.CaptureMode.Queue) Application.Current.Dispatcher.BeginInvoke(() => captureQueue?.ReturnToQueue());
             };
             session.OnRecord = StartRecording;
+            session.OnScroll = StartScrolling;
+            session.OnEnqueue = EnqueueCapture;
             session.OnOpenEditor = OpenEditor;
             capture = session;
             // The overlay's own shortcuts (Ctrl+C, Ctrl+S…) must not be swallowed by global ones.
@@ -218,6 +257,7 @@ public sealed class AppController
         {
             capture = null;
             Output.ShowError(error, "Ekran görüntüsü alınamadı");
+            if (mode == CaptureSession.CaptureMode.Queue) captureQueue?.ReturnToQueue();
         }
         finally
         {
@@ -284,6 +324,8 @@ public sealed class AppController
         {
             case "screenshot": TakeScreenshot(); break;
             case "record": RecordVideo(); break;
+            case "capture-queue": ShowCaptureQueue(); break;
+            case "scrolling-capture": StartCapture(CaptureSession.CaptureMode.Scrolling); break;
             case "edit-last": EditLastCapture(); break;
             case "history": ShowLibrary(); break;
             case "open": OpenFile(); break;
@@ -450,6 +492,8 @@ public sealed class AppController
         menu.Items.Add(updateSeparator);
         UpdateUpdateItem();
         screenshotItem = Item("Ekran görüntüsü al", TakeScreenshot);
+        Item("Kaydırmalı ekran görüntüsü…", () => StartCapture(CaptureSession.CaptureMode.Scrolling));
+        Item("Yakalama kuyruğu…", ShowCaptureQueue);
         recordItem = Item("Alanı videoya kaydet", RecordVideo);
         menu.Items.Add(new Forms.ToolStripSeparator());
         lastCaptureItem = Item("Son yakalamayı düzenle", EditLastCapture);
@@ -533,6 +577,7 @@ public sealed class AppController
         quitting = true;
         ConversionCenter.Shared.Cancel();
         capture?.Cancel();
+        if (scrolling is { } activeScroll) await activeScroll.CancelAsync();
         if (recording is { } active) await active.StopAsync();
     }
 
