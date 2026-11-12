@@ -103,9 +103,9 @@ Sabitlenen görüntü diğer pencerelerin üstünde kalır. Sürükleyerek taş�
 
 ### Kaydırmalı ekran görüntüsü
 
-Bildirim alanı menüsünde **Kaydırmalı ekran görüntüsü…** seçin veya ekran görüntüsü seçimini yaptıktan sonra **Ctrl+J** kullanın. Yalnızca kayan içerik alanını seçip **Başlat** düğmesine basın. FastShot sayfayı aşağı kaydırır, örtüşen kareleri birleştirir ve sonucu düzenleyicide açar. **Bitir ve düzenle** o ana kadarki görüntüyü saklar; **Vazgeç** yakalamayı iptal eder.
+Bildirim alanı menüsünde **Kaydırmalı ekran görüntüsü…** seçin veya ekran görüntüsü seçimini yaptıktan sonra **Ctrl+J** kullanın. Yalnızca kayan içerik alanını seçip yakalamayı başlatın. Sayfayı fare tekerleği, dokunmatik yüzey veya kaydırma çubuğuyla aşağı kaydırın; kenardaki canlı önizleme birleşen görüntüyü gösterir. **Bitir / Enter** sonucu düzenleyicide açar; **Vazgeç / Esc** yakalamayı iptal eder. **Önizlemeyi gizle** ile önizleme kapatılıp tekrar açılabilir.
 
-İşlem sırasında fareyi veya hedef pencereyi değiştirmeyin. Sabit başlık ve araç çubuklarını seçimin dışında bırakın. Eşleşmeyen veya tekrar eden içerikte güvenli birleştirme yapılamazsa işlem açıklamayla durur. Sınırlar: 80 kaydırma adımı, 32.767 piksel yükseklik ve 128 MB görüntü verisi. Yatay kaydırma desteklenmez; kaydırılan uygulamanın içeriği görüntülenebilir ve normal kullanıcı yetkisinde olmalıdır.
+**Otomatik kaydır** isteğe bağlıdır; fareyi hareket ettirince otomatik kaydırma durur ve elle devam edilebilir. Sayfa sonunda yakalama açık kalır. Yukarı kaydırıp yakalanan bölüme dönmek satırları tekrarlamaz. Fazla hızlı kaydırmada veya eşleşmeyen içerikte önizleme korunur: yavaşlayın veya son yakalanan bölüme dönün. Hedef pencere odağını kaybeder, taşınır veya boyutu değişirse yeni kare ekleme bekletilir; pencereyi eski konumuna getirip devam edebilirsiniz. Sabit başlık ve araç çubuklarını seçimin dışında bırakın. Sınırlar: 32.767 piksel yükseklik ve 128 MB görüntü verisi. Yatay kaydırma desteklenmez; kaydırılan uygulamanın içeriği görüntülenebilir ve normal kullanıcı yetkisinde olmalıdır.
 
 ### Ardışık yakalama kuyruğu
 
