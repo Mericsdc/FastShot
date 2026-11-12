@@ -1,19 +1,24 @@
-using System.Windows.Interop;
+using System.Diagnostics;
 
 namespace FastShot;
 
-/// <summary>Scrolls the selected application's viewport and keeps only confidently matched frames.</summary>
+/// <summary>Manual scrolling with a live stitched preview; auto-scroll is an optional helper.</summary>
 public sealed class ScrollingCaptureSession
 {
     readonly RecordRequest request;
     readonly IntPtr target, root;
+    readonly Native.RECT targetBounds;
     readonly Action<BitmapSource, double> completed;
-    readonly Window window;
-    readonly TextBlock status = new() { Text = "Yalnızca kaydırılan içeriği seçin; başlık ve görev çubuğunu dışarıda bırakın. Başlatınca hedef pencere otomatik aşağı kaydırılır.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 10) };
-    readonly Button start = new() { Content = "Başlat", Padding = new Thickness(12, 5, 12, 5), Margin = new Thickness(3) };
     readonly CancellationTokenSource cancellation = new();
     readonly TaskCompletionSource completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    bool running, discard, closing;
+    PanelWindow? shade, controls, preview;
+    ScrollingCaptureHud? hud;
+    readonly ScrollingCapturePreview previewView = new();
+    volatile bool automatic, finishRequested;
+    bool running, discard, previewVisible = true, captureReady;
+    Native.POINT autoPoint, previousCursor;
+    int capturedHeight;
+    string message = "Aşağı kaydırın; istediğiniz yerde Bitir’e basın.";
     public event Action? Finished;
 
     public ScrollingCaptureSession(RecordRequest request, Action<BitmapSource, double> completed)
@@ -22,113 +27,208 @@ public sealed class ScrollingCaptureSession
         var r = request.PixelRect;
         target = Native.WindowFromPoint(new Native.POINT { X = r.Left + r.Width / 2, Y = r.Top + r.Height / 2 });
         root = Native.GetAncestor(target, 2);
-        var panel = new StackPanel { Margin = new Thickness(16) };
-        panel.Children.Add(status);
-        var buttons = new WrapPanel(); buttons.Children.Add(start);
-        var finish = new Button { Content = "Bitir ve düzenle", Padding = new Thickness(12, 5, 12, 5), Margin = new Thickness(3) };
-        var cancel = new Button { Content = "Vazgeç", Padding = new Thickness(12, 5, 12, 5), Margin = new Thickness(3) };
-        buttons.Children.Add(finish); buttons.Children.Add(cancel); panel.Children.Add(buttons);
-        window = new Window { Title = "FastShot Kaydırmalı Yakalama", Icon = AppIcon.WindowIcon, Width = 430, SizeToContent = SizeToContent.Height, ResizeMode = ResizeMode.NoResize, Topmost = true, ShowActivated = false, Content = panel, WindowStartupLocation = WindowStartupLocation.CenterScreen };
-        start.Click += async (_, _) => await Run();
-        finish.Click += (_, _) => { if (running) cancellation.Cancel(); else window.Close(); };
-        cancel.Click += (_, _) => Cancel();
-        window.Closing += (_, e) =>
-        {
-            if (closing) return;
-            discard = true; cancellation.Cancel();
-            if (running) e.Cancel = true;
-        };
-        window.Closed += (_, _) => { completion.TrySetResult(); Finished?.Invoke(); cancellation.Dispose(); };
-        window.SourceInitialized += (_, _) => Native.SetWindowDisplayAffinity(new WindowInteropHelper(window).Handle, Native.WDA_EXCLUDEFROMCAPTURE);
-        window.Loaded += (_, _) =>
-        {
-            var handle = new WindowInteropHelper(window).Handle;
-            Native.GetWindowRect(handle, out var bounds);
-            var work = request.Monitor.Work;
-            var y = r.Bottom + 8;
-            if (y + bounds.Height > work.Bottom) y = Math.Max(work.Top, r.Top - bounds.Height - 8);
-            var x = Math.Clamp(r.Left, work.Left, Math.Max(work.Left, work.Right - bounds.Width));
-            Native.SetWindowPos(handle, Native.HWND_TOPMOST, x, y, bounds.Width, bounds.Height, Native.SWP_NOACTIVATE);
-        };
+        Native.GetWindowRect(root, out targetBounds);
+        capturedHeight = r.Height;
     }
 
-    public void Show() => window.Show();
-    public void Cancel() { if (completion.Task.IsCompleted) return; discard = true; cancellation.Cancel(); if (!running) window.Close(); }
+    public void Show()
+    {
+        if (running || completion.Task.IsCompleted) return;
+        running = true;
+        try
+        {
+            var r = request.PixelRect; var monitor = request.Monitor.Bounds; var s = request.Scale;
+            shade = new PanelWindow(new ScrollingCaptureShade(new Rect((r.Left - monitor.Left) / s, (r.Top - monitor.Top) / s, r.Width / s, r.Height / s)),
+                monitor, transparent: true, activatable: false, clickThrough: true);
+            shade.ExcludeFromCapture(); shade.Show(activate: false);
+            hud = new ScrollingCaptureHud(ToggleAutomatic, Finish, Cancel, () => { previewVisible = !previewVisible; Refresh(); });
+            controls = new PanelWindow(hud.Root, r, transparent: true, activatable: false);
+            controls.ExcludeFromCapture();
+            controls.Source.AddHook(Shortcut);
+            Native.RegisterHotKey(controls.Handle, 1, Native.MOD_NOREPEAT, 0x0D);
+            Native.RegisterHotKey(controls.Handle, 2, Native.MOD_NOREPEAT, 0x1B);
+            controls.Closed += () => { if (running) Cancel(); };
+            preview = new PanelWindow(previewView.Root, r, transparent: true, activatable: false, clickThrough: true);
+            preview.ExcludeFromCapture();
+            Refresh(); controls.Show(activate: false);
+            _ = Run();
+        }
+        catch { Close(); throw; }
+    }
+
+    public void Cancel()
+    {
+        if (completion.Task.IsCompleted) return;
+        discard = true; automatic = false; cancellation.Cancel();
+        if (!running) Close();
+    }
     public Task CancelAsync() { Cancel(); return completion.Task; }
+
+    IntPtr Shortcut(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (message == Native.WM_HOTKEY)
+        {
+            handled = true;
+            if (wParam.ToInt32() == 2) Cancel();
+            else if (captureReady) Finish();
+        }
+        return IntPtr.Zero;
+    }
+
+    void Finish()
+    {
+        if (finishRequested || completion.Task.IsCompleted) return;
+        automatic = false; RestoreCursor(); finishRequested = true; hud?.SetFinishing();
+    }
+
+    void ToggleAutomatic()
+    {
+        if (finishRequested) return;
+        if (automatic) { automatic = false; RestoreCursor(); message = "Aşağı kaydırın; istediğiniz yerde Bitir’e basın."; Refresh(); return; }
+        if (!TargetReady()) { message = "Hedef pencereye dönün; konumunu ve boyutunu değiştirmeyin."; Refresh(); return; }
+        var r = request.PixelRect;
+        var points = new[] { new Native.POINT { X = r.Left + r.Width / 2, Y = r.Top + r.Height / 2 },
+            new Native.POINT { X = r.Left + 20, Y = r.Top + 20 }, new Native.POINT { X = r.Right - 20, Y = r.Top + 20 } };
+        var available = points.Where(p => controls?.Bounds.Contains(p.X, p.Y) != true).ToArray();
+        if (available.Length == 0) return;
+        previousCursor = Native.CursorPosition(); autoPoint = available[0];
+        Native.SetForegroundWindow(root);
+        Native.SetCursorPos(autoPoint.X, autoPoint.Y); automatic = true;
+        message = "Otomatik kaydırılıyor. Fareyi oynatarak durdurabilirsiniz."; Refresh();
+    }
+
+    bool TargetReady()
+    {
+        var foreground = Native.GetForegroundWindow();
+        if (!Native.IsWindow(target) || Native.IsIconic(root) || (foreground != root && foreground != controls?.Handle)) return false;
+        return Native.GetWindowRect(root, out var r) && r.Left == targetBounds.Left && r.Top == targetBounds.Top && r.Right == targetBounds.Right && r.Bottom == targetBounds.Bottom;
+    }
+
+    void RestoreCursor()
+    {
+        var cursor = Native.CursorPosition();
+        if (cursor.X == autoPoint.X && cursor.Y == autoPoint.Y && (autoPoint.X != 0 || autoPoint.Y != 0))
+            Native.SetCursorPos(previousCursor.X, previousCursor.Y);
+        autoPoint = default;
+    }
 
     async Task Run()
     {
-        if (running) return;
-        running = true; start.IsEnabled = false;
-        status.Text = "Yakalanıyor… İşlem bitene kadar hedef pencereyi değiştirmeyin. İstediğiniz yerde Bitir'e basabilirsiniz.";
-        var token = cancellation.Token;
-        var previousCursor = Native.CursorPosition();
-        var r = request.PixelRect;
-        Native.GetWindowRect(new WindowInteropHelper(window).Handle, out var controls);
-        var wheelPoint = new[] {
-            new Native.POINT { X = r.Left + r.Width / 2, Y = r.Top + r.Height / 2 },
-            new Native.POINT { X = r.Right - 20, Y = r.Bottom - 20 },
-            new Native.POINT { X = r.Left + 20, Y = r.Top + 20 },
-        }.FirstOrDefault(p => !controls.Contains(p.X, p.Y));
-        Native.SetForegroundWindow(root);
+        var token = cancellation.Token; var r = request.PixelRect;
         try
         {
-            await Task.Delay(350, token);
-            if (wheelPoint.X == 0 && wheelPoint.Y == 0) throw new InvalidOperationException("Denetim penceresi seçili alanı kapatıyor. Daha büyük bir kaydırma alanı seçin.");
-            Native.SetCursorPos(wheelPoint.X, wheelPoint.Y);
+            await Task.Delay(180, token);
             var result = await Task.Run(async () =>
             {
                 using var capture = new GdiCapture(r.Width, r.Height);
-                byte[] Grab()
+                byte[]? Grab()
                 {
-                    if (!Native.IsWindow(target) || Native.IsIconic(root) || Native.GetForegroundWindow() != root)
-                        throw new InvalidOperationException("Hedef pencere değişti. Kaydırmalı yakalama durduruldu.");
-                    if (!capture.Grab(r.Left, r.Top, cursor: false, layered: true)) throw new IOException("Ekran okunamadı.");
-                    if (Native.GetForegroundWindow() != root) throw new InvalidOperationException("Hedef pencere değişti. Son geçerli görüntü saklandı.");
-                    return capture.ToArray();
+                    if (!TargetReady()) return null;
+                    if (!capture.Grab(r.Left, r.Top, cursor: false)) throw new IOException("Ekran okunamadı.");
+                    return TargetReady() ? capture.ToArray() : null;
                 }
-                var stitcher = new ScrollStitcher(Grab(), r.Width, r.Height);
-                var added = 0; var unchanged = 0; var steps = 0; string? note = null;
-                for (var i = 0; i < 80 && !token.IsCancellationRequested; i++)
+                ScrollStitcher? stitcher = null;
+                var wheelTime = Stopwatch.StartNew(); var unchanged = 0; string? warning = null;
+                var lastMessage = ""; var idleInfo = "Aşağı kaydırın; istediğiniz yerde Bitir’e basın.";
+                while (!token.IsCancellationRequested)
                 {
-                    steps++;
-                    // One wheel notch at a time keeps enough overlap even on small viewports.
-                    if (Native.GetForegroundWindow() != root) { note = "Hedef pencere değişti. Son geçerli görüntü saklandı."; break; }
-                    var cursor = Native.CursorPosition();
-                    if (cursor.X != wheelPoint.X || cursor.Y != wheelPoint.Y) { note = "Fare hareket ettiği için yakalama durduruldu."; break; }
-                    if (!Native.ScrollWheel(-120)) throw new InvalidOperationException("Windows bu pencereye kaydırma girdisi gönderemedi.");
-                    try { await Task.Delay(650, token); }
-                    catch (OperationCanceledException) { break; }
-                    if (token.IsCancellationRequested) break;
-                    byte[] frame;
-                    try { frame = Grab(); }
-                    catch (Exception error) when (error is InvalidOperationException or IOException) { note = error.Message; break; }
-                    var next = stitcher.Append(frame);
-                    if (next == ScrollAppendResult.Added) { added++; unchanged = 0; }
-                    else if (next == ScrollAppendResult.Unchanged) { if (++unchanged >= 2) break; }
+                    var finish = finishRequested;
+                    if (finish) await Task.Delay(160, token);
+                    var frame = Grab();
+                    BitmapSource? image = null;
+                    var info = automatic ? "Otomatik kaydırılıyor. Fareyi oynatarak durdurabilirsiniz." : idleInfo;
+                    if (frame is null)
+                    {
+                        automatic = false;
+                        info = "Bekletildi: hedef pencereye dönün; konumunu ve boyutunu değiştirmeyin.";
+                    }
                     else
                     {
-                        note = next == ScrollAppendResult.LimitReached ? "Görüntü boyut sınırına ulaştı." : "Son kare güvenle birleştirilemedi. Daha dar, yalnızca kayan içeriği kapsayan bir alan seçin.";
-                        break;
+                        var next = ScrollAppendResult.Added;
+                        if (stitcher is null) stitcher = new ScrollStitcher(frame, r.Width, r.Height);
+                        else next = stitcher.Append(frame, token);
+                        if (next == ScrollAppendResult.Added)
+                        { image = stitcher.Preview(300, 720); unchanged = 0; warning = null; idleInfo = "Aşağı kaydırın; istediğiniz yerde Bitir’e basın."; }
+                        else if (next == ScrollAppendResult.Revisited)
+                        { info = idleInfo = "Bu bölüm zaten yakalandı. Aşağı kaydırarak devam edebilirsiniz."; unchanged = 0; warning = null; }
+                        else if (next == ScrollAppendResult.Ambiguous)
+                        {
+                            automatic = false;
+                            info = idleInfo = warning = "Daha yavaş kaydırın veya son yakalanan bölüme dönün; önizleme korundu.";
+                        }
+                        else if (next == ScrollAppendResult.LimitReached)
+                        {
+                            automatic = false; info = idleInfo = warning = "Görüntü sınırına ulaşıldı. Bitir ile yakalanan bölümü alın.";
+                        }
+                        else if (automatic && wheelTime.ElapsedMilliseconds >= 600 && ++unchanged >= 3)
+                        { automatic = false; info = idleInfo = "Sayfa sonu: Bitir’e basın veya elle kaydırmaya devam edin."; }
                     }
+                    if (image is not null || info != lastMessage)
+                    {
+                        lastMessage = info;
+                        var height = stitcher?.Height ?? r.Height; var ready = stitcher is not null;
+                        await controls!.Content.Dispatcher.InvokeAsync(() =>
+                        {
+                            capturedHeight = height; message = info; captureReady = ready;
+                            previewView.Update(image, r.Width, height, 440);
+                            if (!finishRequested) Refresh();
+                        });
+                    }
+                    if (finish) return (image: stitcher?.Image(), warning: frame is null ? "Son kare alınamadı. Son geçerli önizleme saklandı." : warning);
+                    if (automatic && wheelTime.ElapsedMilliseconds >= 600)
+                    {
+                        var cursor = Native.CursorPosition();
+                        if (cursor.X != autoPoint.X || cursor.Y != autoPoint.Y || !TargetReady()) automatic = false;
+                        else if (!Native.ScrollWheel(-120)) { automatic = false; throw new InvalidOperationException("Windows kaydırma girdisini kabul etmedi."); }
+                        wheelTime.Restart();
+                    }
+                    await Task.Delay(80, token);
                 }
-                if (added == 0) note ??= "Sayfa kaymadı veya sayfanın sonundasınız. Kaydırılabilen içerik alanını seçin.";
-                if (steps == 80) note ??= "80 kare sınırına ulaşıldı. Devamı için yeni bir kaydırmalı yakalama başlatabilirsiniz.";
-                return (image: stitcher.Image(), note);
-            });
-            if (!discard)
+                return (image: (BitmapSource?)null, warning: (string?)null);
+            }, token);
+            if (!discard && result.image is not null)
             {
+                shade?.Hide(); controls?.Hide(); preview?.Hide();
                 completed(result.image, request.Scale);
-                if (result.note is { } note) Toast.Show("Kaydırmalı yakalama", Icons.Scan, note);
+                if (result.warning is { } warning) Toast.Show("Kaydırmalı yakalama", Icons.Scan, warning);
             }
         }
         catch (OperationCanceledException) { }
-        catch (Exception error) { if (!discard) Output.ShowError(error, "Kaydırmalı yakalama durdu"); }
-        finally
+        catch (Exception error)
         {
-            var cursor = Native.CursorPosition();
-            if (cursor.X == wheelPoint.X && cursor.Y == wheelPoint.Y) Native.SetCursorPos(previousCursor.X, previousCursor.Y);
-            running = false; closing = true; window.Close();
+            RestoreCursor(); Close();
+            if (!discard) Output.ShowError(error, "Kaydırmalı yakalama durdu");
         }
+        finally { RestoreCursor(); Close(); }
+    }
+
+    void Refresh()
+    {
+        if (hud is null || controls is null || preview is null || completion.Task.IsCompleted) return;
+        hud.Update(message, request.PixelRect.Width, capturedHeight, automatic, captureReady, previewVisible);
+        var work = request.Monitor.Work; var s = controls.Scale;
+        var bar = hud.Measure(new Size(work.Width / s, work.Height / s));
+        var maxPreviewHeight = Math.Max(1, Math.Min(440, work.Height / s - bar.Height - 80));
+        var thumb = previewView.Update(null, request.PixelRect.Width, capturedHeight, maxPreviewHeight);
+        var r = request.PixelRect;
+        var placement = ScrollingCaptureLayout.Place(new Rect(r.Left, r.Top, r.Width, r.Height), new Rect(work.Left, work.Top, work.Width, work.Height),
+            new Size(Math.Ceiling(bar.Width * s), Math.Ceiling(bar.Height * s)), new Size(Math.Ceiling(thumb.Width * s), Math.Ceiling(thumb.Height * s)), 10 * s);
+        static Native.RECT Bounds(Rect rect) => new((int)rect.Left, (int)rect.Top, (int)Math.Ceiling(rect.Right), (int)Math.Ceiling(rect.Bottom));
+        controls.SetBounds(Bounds(placement.Toolbar));
+        if (!placement.Preview.IsEmpty) preview.SetBounds(Bounds(placement.Preview));
+        if (previewVisible && previewView.HasImage && !placement.Preview.IsEmpty) preview.Show(activate: false); else preview.Hide();
+    }
+
+    void Close()
+    {
+        if (completion.Task.IsCompleted) return;
+        running = false;
+        if (controls is not null && !controls.IsDisposed)
+        {
+            Native.UnregisterHotKey(controls.Handle, 1); Native.UnregisterHotKey(controls.Handle, 2);
+            controls.Source.RemoveHook(Shortcut);
+        }
+        preview?.Dispose(); controls?.Dispose(); shade?.Dispose();
+        cancellation.Dispose(); completion.TrySetResult(); Finished?.Invoke();
     }
 }
