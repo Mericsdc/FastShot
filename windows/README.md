@@ -101,13 +101,13 @@ Sabitlenen görüntü diğer pencerelerin üstünde kalır. Sürükleyerek taş�
 - **Boşluk** oynat/duraklat · **I** / **O** kırpma başlangıç/bitiş · **[** / **]** seçili çizimi oynatma çubuğunda başlat/bitir · **←/→** kare kare (Shift ile 1 sn)
 - Dışa aktarma: MP4 (H.264 veya HEVC) ya da GIF; çizimler ve kırpma dışa aktarılan dosyaya işlenir, ses korunur. Orijinal kayıt hiç değişmez.
 
-### Kaydırmalı ekran görüntüsü (1.3.0 geliştirme sürümü)
+### Kaydırmalı ekran görüntüsü
 
 Bildirim alanı menüsünde **Kaydırmalı ekran görüntüsü…** seçin veya ekran görüntüsü seçimini yaptıktan sonra **Ctrl+J** kullanın. Yalnızca kayan içerik alanını seçip **Başlat** düğmesine basın. FastShot sayfayı aşağı kaydırır, örtüşen kareleri birleştirir ve sonucu düzenleyicide açar. **Bitir ve düzenle** o ana kadarki görüntüyü saklar; **Vazgeç** yakalamayı iptal eder.
 
 İşlem sırasında fareyi veya hedef pencereyi değiştirmeyin. Sabit başlık ve araç çubuklarını seçimin dışında bırakın. Eşleşmeyen veya tekrar eden içerikte güvenli birleştirme yapılamazsa işlem açıklamayla durur. Sınırlar: 80 kaydırma adımı, 32.767 piksel yükseklik ve 128 MB görüntü verisi. Yatay kaydırma desteklenmez; kaydırılan uygulamanın içeriği görüntülenebilir ve normal kullanıcı yetkisinde olmalıdır.
 
-### Ardışık yakalama kuyruğu (1.3.0 geliştirme sürümü)
+### Ardışık yakalama kuyruğu
 
 Menü › **Yakalama kuyruğu…** › **Sonraki alanı yakala**. Alanı seçtikten sonra **Enter / Kuyruğa ekle** kullanın. Normal ekran görüntüsü seçiminde **Ctrl+Q** da aynı kuyruğa ekler. **Yukarı / Aşağı / Kaldır** ile sırayı düzenleyin. **PDF kaydet…** her alanı ayrı sayfaya, **Tek PNG kaydet…** görüntüleri özgün piksel boyutlarıyla alt alta kaydeder; dar görüntülerin sağ tarafı beyazla doldurulur.
 
