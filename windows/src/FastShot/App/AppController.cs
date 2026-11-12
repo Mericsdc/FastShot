@@ -28,12 +28,15 @@ public sealed class AppController
     SettingsWindow? settings;
     LibraryWindow? libraryWindow;
     bool startingCapture;
+    bool quitting;
+    readonly ShutdownCoordinator shutdown;
 
     public AppController(string[] arguments, Embedding? embedding = null)
     {
         shared = this;
         launchArguments = arguments;
         this.embedding = embedding;
+        shutdown = new ShutdownCoordinator(PrepareForExit, Shutdown);
     }
 
     /// <summary>Runs inside another app (Xloer) with no tray icon of its own.</summary>
@@ -190,7 +193,7 @@ public sealed class AppController
 
     void StartCapture(CaptureSession.CaptureMode mode)
     {
-        if (capture is not null || startingCapture) return;
+        if (quitting || capture is not null || startingCapture) return;
         if (mode == CaptureSession.CaptureMode.Video && recording is not null) return;
         startingCapture = true;
         try
@@ -224,7 +227,7 @@ public sealed class AppController
 
     void StartRecording(RecordRequest request)
     {
-        if (recording is not null) return;
+        if (quitting || recording is not null) return;
         var session = new RecordingSession(request);
         recording = session;
         SetRecordingStatus(true);
@@ -237,6 +240,7 @@ public sealed class AppController
         {
             recording = null;
             SetRecordingStatus(false);
+            if (quitting) return;
             if (project is null) return;
             if (prefs.OpenEditorAfterRecording) OpenEditor(project);
             else ExportRecording(project);
@@ -512,13 +516,30 @@ public sealed class AppController
         MessageBox.Show(text, "FastShot hazır", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
-    public void Quit()
+    public Task PrepareToQuit() => shutdown.PrepareAsync();
+    public void ResumeAfterFailedUpdate()
     {
+        if (shutdown.ResetPreparation()) quitting = false;
+    }
+
+    public async void Quit()
+    {
+        try { await shutdown.QuitAsync(); }
+        catch (Exception error) { Output.ShowError(error, "FastShot kapatılamadı"); }
+    }
+
+    async Task PrepareForExit()
+    {
+        quitting = true;
         ConversionCenter.Shared.Cancel();
+        capture?.Cancel();
+        if (recording is { } active) await active.StopAsync();
+    }
+
+    void Shutdown()
+    {
         DragMonitor.Shared.Stop();
         OfflineTranslator.Shared.Close();
-        recording?.Cancel();
-        capture?.Cancel();
         foreach (var editor in editors.ToList()) editor.Close();
         HotKeyCenter.Shared.UnregisterAll();
         tray.Visible = false;

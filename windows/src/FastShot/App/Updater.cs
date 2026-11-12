@@ -120,12 +120,14 @@ public sealed class Updater
                 await response.Content.CopyToAsync(output);
             }
             if (new FileInfo(file).Length != release.Size) throw new IOException("İndirilen dosya eksik.");
+            await AppController.Shared.PrepareToQuit();
             Process.Start(new ProcessStartInfo(file) { UseShellExecute = false, ArgumentList = { Installer.UpdateArgument } });
             AppController.Shared.Quit();
         }
         catch (Exception error)
         {
             installing = false;
+            AppController.Shared.ResumeAfterFailedUpdate();
             Error = error.Message;
             Set(Status.Failed);
             Output.ShowError(error, "Güncelleme indirilemedi");

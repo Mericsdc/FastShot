@@ -34,6 +34,7 @@ public sealed class RecordingSession
     double lastFrameTime, frameInterval;
     IntPtr previousWindow;
     string? captureError;
+    readonly TaskCompletionSource<CaptureProject?> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public RecordingSession(RecordRequest request)
     {
@@ -200,6 +201,12 @@ public sealed class RecordingSession
         audioSources.Clear();
     }
 
+    public Task<CaptureProject?> StopAsync()
+    {
+        Stop();
+        return completion.Task;
+    }
+
     public void Stop()
     {
         if (stopping || finished) return;
@@ -298,6 +305,7 @@ public sealed class RecordingSession
         if (finished) return;
         finished = true;
         timer.Stop();
+        completion.TrySetResult(result);
         OnFinish?.Invoke(result);
     }
 

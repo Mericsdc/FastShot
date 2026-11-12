@@ -42,6 +42,9 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      - name: Run Windows regression tests
+        run: dotnet test windows/FastShot.slnx -c Release --logger "trx;LogFileName=windows-tests.trx"
+
       - name: Version from the tag
         id: version
         run: |

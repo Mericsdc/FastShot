@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\FastShot.Core\FastShot.Core.csproj" />
+    <ProjectReference Include="..\..\src\FastShot\FastShot.csproj" />
   </ItemGroup>
 
 </Project>
