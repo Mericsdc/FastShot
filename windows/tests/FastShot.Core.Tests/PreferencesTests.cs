@@ -85,13 +85,15 @@ public sealed class PreferencesTests : IDisposable
         var prefs = Preferences.Load(File);
         prefs.ScreenshotHotkey = ControlP;
         var locked = new FileStream(File, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
-        var release = Task.Run(async () =>
+        // Its own thread, so a busy thread pool (tests run in parallel) cannot delay the release.
+        var release = new Thread(() =>
         {
-            await Task.Delay(400);
+            Thread.Sleep(400);
             locked.Dispose();
         });
-        var restarted = Preferences.Load(File);
-        release.Wait();
+        release.Start();
+        var restarted = Preferences.Load(File, retryFor: TimeSpan.FromSeconds(10));
+        release.Join();
         Assert.Equal(ControlP, restarted.ScreenshotHotkey);
     }
 
