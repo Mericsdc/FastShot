@@ -156,7 +156,7 @@ git tag -a windows-v1.1.0 -m "Bu sürümde neler değişti"
 git push origin windows-v1.1.0
 ```
 
-İş akışı exe'yi derler, `--embedded` ile bir kez açıp kapanabildiğini dener, sonra `FastShot-Setup-x64.exe`'yi sürüme ekler; kurulu FastShot'lar güncellemeyi buradan alır. Aynı etiket yeniden çalışırsa exe değiştirilir. Actions › Windows › "Run workflow" (sadece derle) yayınlamadan dener; exe işin "Artifacts" bölümünden indirilebilir. macOS uygulaması bu iş akışından etkilenmez.
+İş akışı exe'yi derler, `--embedded` ile bir kez açıp kapanabildiğini dener, sonra `FastShot-Setup-x64.exe`'yi sürüme ekler ve daha eski Windows sürümlerini Releases'tan siler (etiketleri kalır); kurulu FastShot'lar güncellemeyi buradan alır, böylece herkes aynı sürüme geçer. Aynı etiket yeniden çalışırsa exe değiştirilir. Actions › Windows › "Run workflow" (sadece derle) yayınlamadan dener; exe işin "Artifacts" bölümünden indirilebilir. macOS uygulaması bu iş akışından etkilenmez.
 
 Xloer'in içindeki FastShot bu klasörden kopyalanır: Xloer'de `npm run sync-fastshot`.
 

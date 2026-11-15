@@ -98,6 +98,26 @@ jobs:
           }
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Keep only this Windows release
+        if: startsWith(github.ref, 'refs/tags/windows-v') && !inputs.build_only
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # One Windows version: installed copies update themselves to this one, so older Windows
+          # releases are deleted (their tags stay). macOS releases are not touched.
+          $tag = $env:TAG
+          if ($tag -notmatch '^windows-v(\d+\.\d+\.\d+)$') { exit 0 }
+          $current = [version]$Matches[1]
+          $tags = gh release list --limit 200 --json tagName --jq '.[].tagName'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($old in $tags) {
+            if ($old -notmatch '^windows-v(\d+\.\d+\.\d+)$' -or [version]$Matches[1] -ge $current) { continue }
+            gh release delete $old --yes
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            "Deleted release $old" >> $env:GITHUB_STEP_SUMMARY
+          }
+
       - name: Keep the exe of a build-only run
         if: ${{ !startsWith(github.ref, 'refs/tags/windows-v') || inputs.build_only }}
         uses: actions/upload-artifact@v7
