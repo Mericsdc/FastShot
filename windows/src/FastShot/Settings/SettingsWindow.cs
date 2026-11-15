@@ -178,12 +178,13 @@ public sealed class SettingsWindow : Window
                     Updater.Status.Checking => $"Sürüm {version}. Denetleniyor…",
                     Updater.Status.Available => $"Sürüm {version}. FastShot {updater.Available!.Version.ToString(3)} hazır.",
                     Updater.Status.Downloading => "Güncelleme indiriliyor; FastShot birazdan yeniden açılacak.",
+                    Updater.Status.Ready => $"Sürüm {version}. FastShot {updater.Available!.Version.ToString(3)} indirildi; yaptığınız iş (kayıt, düzenleme, dönüştürme) bitince kendiliğinden kurulacak.",
                     Updater.Status.UpToDate => $"Sürüm {version}. FastShot güncel (son denetim {updater.LastChecked:HH:mm}).",
                     Updater.Status.Failed => $"Sürüm {version}. {updater.Error}",
                     _ => $"Sürüm {version}.",
                 };
-            check.IsEnabled = installed && updater.State is not (Updater.Status.Checking or Updater.Status.Downloading);
-            install.Visibility = updater.State == Updater.Status.Available ? Visibility.Visible : Visibility.Collapsed;
+            check.IsEnabled = installed && updater.State is not (Updater.Status.Checking or Updater.Status.Downloading or Updater.Status.Ready);
+            install.Visibility = updater.State is Updater.Status.Available or Updater.Status.Ready ? Visibility.Visible : Visibility.Collapsed;
             if (updater.Available is { } release) install.Content = $"{release.Version.ToString(3)} sürümüne güncelle";
         }
         void Changed() => Dispatcher.BeginInvoke(Sync);
@@ -193,7 +194,7 @@ public sealed class SettingsWindow : Window
         Sync();
         panel.Children.Add(status);
         panel.Children.Add(buttons);
-        panel.Children.Add(Toggle("Güncellemeleri otomatik denetle", () => prefs.CheckForUpdates, on => prefs.CheckForUpdates = on));
+        panel.Children.Add(Note("FastShot, Windows açılınca ve sonra 6 saatte bir yeni sürümü denetler; varsa kendiliğinden indirip kurar ve yeniden açılır. Kayıt, düzenleme veya dönüştürme sürüyorsa bitmesini bekler."));
         var releases = new Button { Content = "Sürüm notları", Padding = new Thickness(12, 4, 12, 5), HorizontalAlignment = HorizontalAlignment.Left };
         releases.Click += (_, _) => Output.OpenUrl(Updater.ReleasesPage);
         panel.Children.Add(releases);

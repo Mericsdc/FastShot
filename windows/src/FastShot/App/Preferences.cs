@@ -76,7 +76,6 @@ public sealed class Preferences
         public bool RecordMicrophone;
         public bool PrintScreenTakenOver;
         public bool ShowTrayIcon = true;
-        public bool CheckForUpdates = true;
         public TranslateEngine TranslateEngine = TranslateEngine.Offline;
         public string TranslateTarget = "tr";
         public double AnnotationLength = 3;
@@ -247,8 +246,6 @@ public sealed class Preferences
     public bool PrintScreenTakenOver { get => data.PrintScreenTakenOver; set => Set(ref data.PrintScreenTakenOver, value); }
     /// <summary>The notification-area icon. Hidden, FastShot still runs; starting it again opens Settings.</summary>
     public bool ShowTrayIcon { get => data.ShowTrayIcon; set => Set(ref data.ShowTrayIcon, value); }
-    /// <summary>The installed copy looks for new releases on GitHub (see Updater).</summary>
-    public bool CheckForUpdates { get => data.CheckForUpdates; set => Set(ref data.CheckForUpdates, value); }
     /// <summary>DeepL needs the user's own key (see DeepLKey); without one the offline engine is used.</summary>
     public TranslateEngine TranslateEngine { get => data.TranslateEngine; set => Set(ref data.TranslateEngine, value); }
     /// <summary>The language the translation window translates to; it remembers the last choice.</summary>

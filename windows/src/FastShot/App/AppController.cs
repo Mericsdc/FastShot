@@ -92,6 +92,7 @@ public sealed class AppController
             // An install moves FastShot; Windows should start the copy that is here now.
             if (Preferences.LaunchAtLogin) Preferences.LaunchAtLogin = true;
             Updater.Shared.Changed += UpdateUpdateItem;
+            Updater.Shared.IsBusy = () => Busy;
             Updater.Shared.Start();
         }
         if (launchArguments.Contains(Installer.UpdatedArgument))
@@ -526,13 +527,19 @@ public sealed class AppController
     /// <summary>No icon inside Xloer, nor when Settings hides it.</summary>
     bool TrayVisible => !Embedded && prefs.ShowTrayIcon;
 
+    /// <summary>Something the user is in the middle of, which an automatic update waits for: a capture, a recording, an open
+    /// editor, crop window, capture queue or translation, or files being converted.</summary>
+    bool Busy => startingCapture || capture is not null || recording is not null || scrolling is not null || editors.Count > 0
+                 || captureQueue is not null || ConversionCenter.Shared.IsBusy
+                 || Application.Current.Windows.OfType<Window>().Any(w => w.IsVisible && w is CropWindow or TranslateCard);
+
     /// <summary>"Güncelle: FastShot 1.2.0" at the top of the menu while a newer version is out.</summary>
     void UpdateUpdateItem()
     {
         var updater = Updater.Shared;
-        var show = updater.State is Updater.Status.Available or Updater.Status.Downloading;
+        var show = updater.State is Updater.Status.Available or Updater.Status.Downloading or Updater.Status.Ready;
         updateItem.Visible = updateSeparator.Visible = show;
-        updateItem.Enabled = updater.State == Updater.Status.Available;
+        updateItem.Enabled = updater.State is Updater.Status.Available or Updater.Status.Ready;
         if (updater.Available is { } release)
             updateItem.Text = updater.State == Updater.Status.Downloading ? "Güncelleme indiriliyor…" : $"Güncelle: FastShot {release.Version.ToString(3)}";
     }
