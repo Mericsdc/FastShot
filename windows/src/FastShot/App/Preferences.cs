@@ -37,7 +37,7 @@ public sealed class Preferences
         IncludeFields = true,
         Converters = { new JsonStringEnumConverter() },
     };
-    public static Preferences Shared { get; } = Load();
+    public static Preferences Shared { get; } = Load(Path);
 
     public static string Path => System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "FastShot", "settings.json");
 
@@ -86,22 +86,91 @@ public sealed class Preferences
     }
 
     readonly Data data;
+    readonly string file;
     readonly object gate = new();
+    /// <summary>The file was there but could not be read: it is copied aside before anything replaces it.</summary>
+    bool unread;
 
-    Preferences(Data data) { this.data = data; }
-
-    static Preferences Load()
+    Preferences(Data data, string file, bool unread)
     {
-        try
+        this.data = data;
+        this.file = file;
+        this.unread = unread;
+    }
+
+    /// <summary>Where a settings file that could not be read is kept, instead of being replaced by the defaults.</summary>
+    string UnreadablePath => System.IO.Path.ChangeExtension(file, ".unreadable.json");
+
+    /// <summary>Reads the settings at <paramref name="file"/>. At sign-in another program (antivirus, backup) can hold the file
+    /// for a moment, so a locked file is tried again for <paramref name="retryFor"/> (2 s by default).</summary>
+    internal static Preferences Load(string file, TimeSpan? retryFor = null)
+    {
+        if (!File.Exists(file)) return new Preferences(new Data(), file, unread: false);
+        var deadline = DateTime.UtcNow + (retryFor ?? TimeSpan.FromSeconds(2));
+        while (true)
         {
-            if (File.Exists(Path))
+            try
             {
-                var loaded = JsonSerializer.Deserialize<Data>(File.ReadAllText(Path), jsonOptions);
-                if (loaded is not null) return new Preferences(loaded);
+                var data = Parse(File.ReadAllText(file));
+                if (data is not null) return new Preferences(data, file, unread: false);
+                Program.Log(new InvalidDataException($"Ayarlar okunamadı, varsayılanlarla açıldı: {file}"));
+                break;
+            }
+            catch (FileNotFoundException) { return new Preferences(new Data(), file, unread: false); }
+            catch (DirectoryNotFoundException) { return new Preferences(new Data(), file, unread: false); }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                if (DateTime.UtcNow >= deadline)
+                {
+                    Program.Log(new IOException($"Ayarlar dosyası açılamadı, varsayılanlarla açıldı: {file}", error));
+                    break;
+                }
+                Thread.Sleep(100);
             }
         }
-        catch { /* corrupt settings fall back to defaults */ }
-        return new Preferences(new Data());
+        var preferences = new Preferences(new Data(), file, unread: true);
+        preferences.KeepUnreadFile();
+        return preferences;
+    }
+
+    /// <summary>Reads each setting on its own, so a value this version does not understand (one written by another version,
+    /// say) only resets that setting. Null when the text is not a JSON object at all (a file cut short, for example).</summary>
+    static Data? Parse(string json)
+    {
+        JsonDocument document;
+        try { document = JsonDocument.Parse(json); }
+        catch (JsonException) { return null; }
+        using (document)
+        {
+            if (document.RootElement.ValueKind != JsonValueKind.Object) return null;
+            var data = new Data();
+            foreach (var field in typeof(Data).GetFields())
+            {
+                if (!document.RootElement.TryGetProperty(field.Name, out var value)) continue;
+                try { field.SetValue(data, value.Deserialize(field.FieldType, jsonOptions)); }
+                catch (Exception error) when (error is JsonException or NotSupportedException or InvalidOperationException or ArgumentException)
+                {
+                    Program.Log(new InvalidDataException($"Ayar okunamadı, varsayılan kullanılıyor: {field.Name}", error));
+                }
+            }
+            return data;
+        }
+    }
+
+    /// <summary>Copies a settings file that could not be read to settings.unreadable.json. False while it still cannot be copied.</summary>
+    bool KeepUnreadFile()
+    {
+        if (!unread) return true;
+        try
+        {
+            if (File.Exists(file)) File.Copy(file, UnreadablePath, overwrite: true);
+            unread = false;
+            return true;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 
     void Set<T>(ref T field, T value)
@@ -112,16 +181,46 @@ public sealed class Preferences
         Changed?.Invoke();
     }
 
+    /// <summary>Writes a new file and then moves it over the old one, so the settings are never left half written
+    /// (when Windows shuts down or FastShot is ended in the middle of a save).</summary>
     void Save()
     {
         lock (gate)
         {
+            // Never replace settings that were not read without keeping a copy; until then they stay in memory.
+            if (!KeepUnreadFile())
+            {
+                Program.Log(new IOException($"Ayarlar kaydedilmedi; okunamayan dosyanın üstüne yazılmıyor: {file}"));
+                return;
+            }
+            var temp = file + "." + Environment.ProcessId + ".tmp";
             try
             {
-                Directory.CreateDirectory(System.IO.Path.GetDirectoryName(Path)!);
-                File.WriteAllText(Path, JsonSerializer.Serialize(data, jsonOptions));
+                Directory.CreateDirectory(System.IO.Path.GetDirectoryName(file)!);
+                using (var stream = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None))
+                {
+                    JsonSerializer.Serialize(stream, data, jsonOptions);
+                    stream.Flush(flushToDisk: true);
+                }
+                for (var attempt = 1; ; attempt++)
+                {
+                    try
+                    {
+                        File.Move(temp, file, overwrite: true);
+                        break;
+                    }
+                    catch (Exception error) when (attempt < 5 && error is IOException or UnauthorizedAccessException)
+                    {
+                        Thread.Sleep(50);
+                    }
+                }
             }
-            catch { /* settings stay in memory for this session */ }
+            catch (Exception error)
+            {
+                // The settings stay in memory for this session.
+                Program.Log(new IOException($"Ayarlar kaydedilemedi: {file}", error));
+                try { File.Delete(temp); } catch { /* nothing left to clean up */ }
+            }
         }
     }
 

@@ -208,7 +208,7 @@ public sealed class SettingsWindow : Window
         page.Children.Add(ShortcutRow("Ekran görüntüsü (2. kısayol)", () => prefs.ScreenshotHotkeyAlt, v => prefs.ScreenshotHotkeyAlt = v));
         page.Children.Add(ShortcutRow("Video kaydı başlat / bitir", () => prefs.RecordHotkey, v => prefs.RecordHotkey = v));
         page.Children.Add(ShortcutRow("Video kaydı (2. kısayol)", () => prefs.RecordHotkeyAlt, v => prefs.RecordHotkeyAlt = v));
-        page.Children.Add(Note("Değiştirmek için kısayola tıklayıp yeni tuş kombinasyonuna basın (Esc: vazgeç). Print Screen, F1–F24, Insert ve Pause tek başına kullanılabilir; diğer tuşlar Ctrl, Alt veya Win ile birlikte."));
+        page.Children.Add(Note("Değiştirmek için kısayola tıklayıp yeni tuşa ya da tuş kombinasyonuna basın (Esc: vazgeç). Tek bir tuş da atanabilir (ör. P, F8 veya Print Screen). Harf, rakam veya boşluk gibi bir yazı tuşunu Ctrl, Alt ya da Win olmadan atarsanız, FastShot çalıştığı sürece o tuş hiçbir yerde yazmaz, yalnızca kısayol olarak çalışır."));
         var reset = new Button { Content = "Varsayılanlara dön", Padding = new Thickness(12, 4, 12, 5), HorizontalAlignment = HorizontalAlignment.Left };
         reset.Click += (_, _) => { prefs.ResetShortcuts(); Refresh(); };
         page.Children.Add(reset);
@@ -256,10 +256,12 @@ public sealed class SettingsWindow : Window
         {
             recorder.Refresh();
             var value = get();
-            warning.Text = value is not null && HotKeyCenter.Shared.Failed.Contains(value)
-                ? value == KeyCombo.PrintScreen && PrintScreenSetting.OpensSnippingTool
-                    ? "Windows bu tuşu Ekran Alıntısı Aracı için kullanıyor (aşağıya bakın)."
-                    : "Başka bir uygulama bu kısayolu kullanıyor."
+            warning.Text = value is null ? ""
+                : HotKeyCenter.Shared.Failed.Contains(value)
+                    ? value == KeyCombo.PrintScreen && PrintScreenSetting.OpensSnippingTool
+                        ? "Windows bu tuşu Ekran Alıntısı Aracı için kullanıyor (aşağıya bakın)."
+                        : "Başka bir uygulama bu kısayolu kullanıyor."
+                : value.BlocksTyping ? "FastShot çalışırken bu tuş hiçbir yerde yazmaz."
                 : "";
             warning.Visibility = warning.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
