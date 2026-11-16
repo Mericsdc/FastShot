@@ -7,7 +7,14 @@
 #
 # The tag's message becomes the release notes, and the version in the tag
 # goes into the exe. A tag whose release already exists gets its exe replaced.
+#
+# Without pushing a tag: Actions > Windows > "Run workflow" on main with
+# "Yayınla" ticked publishes windows-v<Version from windows/Directory.Build.props>,
+# with windows/release-notes.md as its notes (a version that is already out is
+# refused: raise the version first).
+#
 # "Run workflow" (build only) builds and starts the exe without publishing.
+# After publishing, older Windows releases are deleted (their tags stay).
 # The macOS app is not touched.
 
 name: Windows
@@ -23,6 +30,10 @@ on:
         description: Sadece derle, yayınlama (deneme)
         type: boolean
         default: true
+      publish:
+        description: "Yayınla (yalnızca main; Sadece derle'yi geçersiz kılar): Directory.Build.props'taki sürümü windows/release-notes.md notlarıyla yayınlar"
+        type: boolean
+        default: false
 
 concurrency:
   group: windows-release
@@ -50,11 +61,28 @@ jobs:
 
       - name: Version from the tag
         id: version
+        env:
+          REF: ${{ github.ref }}
+          REF_NAME: ${{ github.ref_name }}
+          BUILD_ONLY: ${{ inputs.build_only }}
+          PUBLISH: ${{ inputs.publish }}
         run: |
-          $ref = '${{ github.ref_name }}'
-          $version = if ($ref -match '^windows-v(\d+\.\d+\.\d+)$') { $Matches[1] } else { '0.0.0' }
+          # A windows-v* tag (pushed, or its release published) is published unless the run is build-only.
+          # "Run workflow" on main with "publish" publishes the version in Directory.Build.props.
+          $version = '0.0.0'; $tag = ''; $publish = $false; $fromTag = $false
+          if ($env:REF -like 'refs/tags/*' -and $env:REF_NAME -match '^windows-v(\d+\.\d+\.\d+)$') {
+            $version = $Matches[1]; $tag = $env:REF_NAME; $publish = $env:BUILD_ONLY -ne 'true'; $fromTag = $true
+          } elseif ($env:PUBLISH -eq 'true') {
+            if ($env:REF -ne 'refs/heads/main') { throw "Yalnızca main yayınlanır (bu: $env:REF_NAME)." }
+            $version = ([xml](Get-Content windows/Directory.Build.props)).Project.PropertyGroup.Version
+            if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Directory.Build.props'taki sürüm okunamadı: $version" }
+            $tag = "windows-v$version"; $publish = $true
+          }
           "version=$version" >> $env:GITHUB_OUTPUT
-          "FastShot for Windows $version" >> $env:GITHUB_STEP_SUMMARY
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "publish=$($publish.ToString().ToLower())" >> $env:GITHUB_OUTPUT
+          "from_tag=$($fromTag.ToString().ToLower())" >> $env:GITHUB_OUTPUT
+          "FastShot for Windows $version" + $(if ($publish) { " → $tag yayınlanacak" } else { '' }) >> $env:GITHUB_STEP_SUMMARY
 
       - name: Build FastShot-Setup-x64.exe
         env:
@@ -84,25 +112,33 @@ jobs:
           if (-not $process.WaitForExit(30000)) { $process.Kill(); throw 'FastShot did not quit' }
           "Started and quit: $($line.Result)" >> $env:GITHUB_STEP_SUMMARY
 
-      - name: Publish ${{ github.ref_name }}
-        if: startsWith(github.ref, 'refs/tags/windows-v') && !inputs.build_only
+      - name: Publish ${{ steps.version.outputs.tag }}
+        if: steps.version.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+          FROM_TAG: ${{ steps.version.outputs.from_tag }}
         run: |
-          $tag = '${{ github.ref_name }}'
+          $tag = $env:TAG
           gh release view $tag > $null 2>&1
-          if ($LASTEXITCODE -eq 0) {
-            gh release upload $tag out/FastShot-Setup-x64.exe --clobber
+          $exists = $LASTEXITCODE -eq 0
+          if ($env:FROM_TAG -eq 'true') {
+            if ($exists) { gh release upload $tag out/FastShot-Setup-x64.exe --clobber }
+            else { gh release create $tag out/FastShot-Setup-x64.exe --title "FastShot for Windows $env:VERSION" --notes-from-tag --verify-tag }
           } else {
-            gh release create $tag out/FastShot-Setup-x64.exe --title "FastShot for Windows ${{ steps.version.outputs.version }}" --notes-from-tag --verify-tag
+            # Installed copies only take a higher version, so the same version must not be published twice.
+            if ($exists) { throw "$tag zaten yayınlandı; windows/Directory.Build.props'ta sürümü yükseltin." }
+            gh release create $tag out/FastShot-Setup-x64.exe --title "FastShot for Windows $env:VERSION" --notes-file windows/release-notes.md --target $env:GITHUB_SHA
           }
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "Published $tag" >> $env:GITHUB_STEP_SUMMARY
 
       - name: Keep only this Windows release
-        if: startsWith(github.ref, 'refs/tags/windows-v') && !inputs.build_only
+        if: steps.version.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
           # One Windows version: installed copies update themselves to this one, so older Windows
           # releases are deleted (their tags stay). macOS releases are not touched.
@@ -119,7 +155,7 @@ jobs:
           }
 
       - name: Keep the exe of a build-only run
-        if: ${{ !startsWith(github.ref, 'refs/tags/windows-v') || inputs.build_only }}
+        if: steps.version.outputs.publish != 'true'
         uses: actions/upload-artifact@v7
         with:
           name: FastShot-Setup-x64
