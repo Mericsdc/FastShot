@@ -330,6 +330,7 @@ public sealed class AppController
             case "edit-last": EditLastCapture(); break;
             case "history": ShowLibrary(); break;
             case "open": OpenFile(); break;
+            case "open-project": OpenProjectFolder(); break;
             case "wheel": ConversionCenter.Shared.ChooseFiles(); break;
             case "translate": TranslateCard.Show(""); break;
             case "settings": OpenSettings(); break;
