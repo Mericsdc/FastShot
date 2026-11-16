@@ -156,6 +156,8 @@ git tag -a windows-v1.1.0 -m "Bu sürümde neler değişti"
 git push origin windows-v1.1.0
 ```
 
+Etiket göndermeden: `windows/Directory.Build.props`'taki `Version`'ı yükseltip sürüm notlarını `windows/release-notes.md`'ye yazın, `main`'e alın; sonra Actions › Windows › "Run workflow" › dal `main`, **Yayınla** işaretli. İş akışı `windows-v<Version>` etiketini ve sürümü kendisi oluşturur; zaten yayınlanmış bir sürümü yeniden yayınlamaz.
+
 İş akışı exe'yi derler, `--embedded` ile bir kez açıp kapanabildiğini dener, sonra `FastShot-Setup-x64.exe`'yi sürüme ekler ve daha eski Windows sürümlerini Releases'tan siler (etiketleri kalır); kurulu FastShot'lar güncellemeyi buradan alır, böylece herkes aynı sürüme geçer. Aynı etiket yeniden çalışırsa exe değiştirilir. Actions › Windows › "Run workflow" (sadece derle) yayınlamadan dener; exe işin "Artifacts" bölümünden indirilebilir. macOS uygulaması bu iş akışından etkilenmez.
 
 Xloer'in içindeki FastShot bu klasörden kopyalanır: Xloer'de `npm run sync-fastshot`.
